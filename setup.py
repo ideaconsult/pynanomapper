@@ -17,7 +17,6 @@ setup(
     project_urls={
         "Issue tracker": "https://github.com/ideaconsult/pynanomapper/issues",
     },
-    license="MIT",
     classifiers=[
         "Environment :: Web Environment",
         "Intended Audience :: Developers",
