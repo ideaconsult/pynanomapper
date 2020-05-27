@@ -36,4 +36,10 @@ setup(
     packages=[
         "pynanomapper",
     ],
+    install_requires=[
+        "jproperties",
+        "pandas",
+        "pyyaml",
+        "requests",
+    ],
 )

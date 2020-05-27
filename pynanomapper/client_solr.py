@@ -7,7 +7,7 @@ from pandas.io.json import json_normalize
 global logger
 logger = logging.getLogger()
 import json
-from solrscope import annotation
+from pynanomapper import annotation
 
 def post(service_uri,query,auth=None):
     r = requests.post(service_uri + "/select",data=query, auth=auth)
