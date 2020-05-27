@@ -8,17 +8,17 @@ class Dictionary:
         self.topic=topic
         self.folder = folder
         self.loadDictionary()
-        
+
     def loadDictionary(self):
         prop_file= self.folder + self.topic + ".properties"
         try:
             with open(prop_file, "rb") as f:
-                self.lookup.load(f, "utf-8") 
+                self.lookup.load(f, "utf-8")
 
         except Exception as err:
             self.lookup = None
             print(err)
-            
+
     def annotate(self,x):
         if self.lookup is None:
             return None
@@ -29,41 +29,41 @@ class Dictionary:
                 value, meta = self.lookup[x_]
                 return value
             else:
-                return x      
+                return x
         except:
             return None
-        
+
     def getLink(self,ontouri):
         if ontouri.startswith("http"):
             return "http://bioportal.bioontology.org/ontologies/ENM/?p=classes&conceptid=" + ontouri
         else:
             return None
-        
-   
-class DictionaryEndpoints(Dictionary):    
+
+
+class DictionaryEndpoints(Dictionary):
     def __init__(self,folder = './annotation/', topic='endpoint'):
         super().__init__(folder = './annotation/', topic='endpoint')
-            
-class DictionaryAssays(Dictionary):    
+
+class DictionaryAssays(Dictionary):
     def __init__(self,folder = './annotation/', topic='assays'):
-        super().__init__(folder = './annotation/', topic='assays')            
-            
-class DictionaryCells(Dictionary):    
+        super().__init__(folder = './annotation/', topic='assays')
+
+class DictionaryCells(Dictionary):
     def __init__(self,folder = './annotation/', topic='cells'):
-        super().__init__(folder = './annotation/', topic='cells')               
-        
-class DictionaryEndpointCategory(Dictionary):    
+        super().__init__(folder = './annotation/', topic='cells')
+
+class DictionaryEndpointCategory(Dictionary):
     def __init__(self,folder = './annotation/', topic='endpointcategory'):
-        super().__init__(folder = './annotation/', topic='endpointcategory')                       
+        super().__init__(folder = './annotation/', topic='endpointcategory')
 
-class DictionaryEndpointCategoryNames(Dictionary):    
+class DictionaryEndpointCategoryNames(Dictionary):
     def __init__(self,folder = './annotation/', topic='endpointcategory_names'):
-        super().__init__(folder = './annotation/', topic='endpointcategory_names')  
-        
-class DictionarySpecies(Dictionary):    
-    def __init__(self,folder = './annotation/', topic='species'):
-        super().__init__(folder = './annotation/', topic='species')       
+        super().__init__(folder = './annotation/', topic='endpointcategory_names')
 
-class DictionarySubstancetypes(Dictionary):    
+class DictionarySpecies(Dictionary):
+    def __init__(self,folder = './annotation/', topic='species'):
+        super().__init__(folder = './annotation/', topic='species')
+
+class DictionarySubstancetypes(Dictionary):
     def __init__(self,folder = './annotation/', topic='substancetype'):
-        super().__init__(folder = './annotation/', topic='substancetype')                                       
+        super().__init__(folder = './annotation/', topic='substancetype')

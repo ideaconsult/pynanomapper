@@ -28,11 +28,11 @@ class Facets:
     def parse(self,facets,key="ALL",prefix="",process=None,_tuple=()):
         count = facets['count']
         if 'val' in facets:
-            val = facets['val']            
+            val = facets['val']
         else:
             val='_'
-        if process is None:    
-            print("{}\t{}'{}'\t{}\t{}".format(prefix,_tuple,val,count,key)) 
+        if process is None:
+            print("{}\t{}'{}'\t{}\t{}".format(prefix,_tuple,val,count,key))
         else:
             process(prefix,val,count,key,_tuple)
         if facets== None:
@@ -54,24 +54,24 @@ class Facets:
         fieldname="field{}".format(n)
         if nested==None:
             nested_facet=""
-        else:    
-            nested_facet= ", facet:" + nested 
+        else:
+            nested_facet= ", facet:" + nested
         return "{" + fieldname + ": {"+ "{}:{},{}:{} ,limit : -1, mincount:1, missing:true ".format("type","terms","field",field) +nested_facet + "}}"
 
 
     def getNestedFacets(self,facets=["endpointcategory_s","effectendpoint_s","unit_s"]):
         if facets is None:
             return ''
-        
+
         n=len(facets)
         if n==1:
             nested_facet=None
-        else:    
+        else:
             nested_facet = self.getNestedFacets(facets[1:len(facets)])
         facet = self.getFacet(facets[0],n,nested_facet)
         return facet
 
-        
+
     #json_facet="{field1: {" + "{}:{},{}:{} ,limit : -1, mincount:1 ".format("type","terms","field",field1) + field2_facet + " }}"
 
     #query={'q': query,"wt" : "json", "json.facet": json_facet, 'rows': 0}
@@ -94,10 +94,10 @@ class Facets:
 
             except Exception as err:
                 pass
-            field_2.append(_field2.strip())    
+            field_2.append(_field2.strip())
 
         return pd.DataFrame({key1 : fields_name, "count" : fields_count, key2 : field_2})
-    
+
     def summary(this,service_uri,auth_object,query="*:*",fq="type_s:study",statistics="Number of data points",fields=["topcategory_s","endpointcategory_s","E.method_s","substanceType_s","publicname_s","reference_owner_s"],log_query=None,log_result=None):
         colnames=["Z"]
         colnames.extend(fields)
@@ -124,8 +124,8 @@ class Facets:
                 df[ 'substanceType_name']=df[ 'substanceType_s'].apply(a.annotate)
             if "substanceType_hs" in df.columns:
                 a = annotation.DictionarySubstancetypes()
-                df[ 'substanceType_name']=df[ 'substanceType_hs'].apply(a.annotate)            
-            if "endpointcategory_s" in df.columns:    
+                df[ 'substanceType_name']=df[ 'substanceType_hs'].apply(a.annotate)
+            if "endpointcategory_s" in df.columns:
                 a = annotation.DictionaryEndpointCategory()
                 df[ 'endpointcategory_term']=df[ 'endpointcategory_s'].apply(a.annotate)
                 a = annotation.DictionaryEndpointCategoryNames()
@@ -137,26 +137,26 @@ class Facets:
             return (df)
         else:
             print(r.status_code)
-            return (None)           
+            return (None)
 
-class StudyDocuments:    
-    
+class StudyDocuments:
+
     def __init__(self):
-        #settings['query_organism']="Daphnia magna"  
+        #settings['query_organism']="Daphnia magna"
         #settings['studyfilter']=' topcategory_s:ECOTOX AND endpointcategory_s:EC_DAPHNIATOX_SECTION AND guidance_s:OECD_TG_202 '
-        #settings['endpointfilter']= ' effectendpoint_s:LC50 '        
+        #settings['endpointfilter']= ' effectendpoint_s:LC50 '
         self.settings={}
         self.settings['studyfilter'] = None
         self.settings['query_organism'] = None
         self.settings['endpointfilter'] = None
         self.settings['query_guidance'] = None
         self.settings['fields'] = "dbtag_hss,name_hs,publicname_hs,substanceType_hs,owner_name_hs,s_uuid_hs,substance_annotation_hss"
-        
+
     def getSettings(self):
         return self.settings
-    
-    def setStudyFilter(self,filter = {'topcategory_s':'ECOTOX', 'endpointcategory_s':'EC_FISHTOX_SECTION','guidance_s':'OECD_TG_203'}, combineas = 'AND' ):       
-        self.settings['studyfilter'] =''   
+
+    def setStudyFilter(self,filter = {'topcategory_s':'ECOTOX', 'endpointcategory_s':'EC_FISHTOX_SECTION','guidance_s':'OECD_TG_203'}, combineas = 'AND' ):
+        self.settings['studyfilter'] =''
         sep=' '
         for i in filter:
             self.settings['studyfilter'] = self.settings['studyfilter'] + ' {} {}:{}'.format(sep,i,filter[i])
@@ -164,7 +164,7 @@ class StudyDocuments:
         return self.settings['studyfilter']
 
     def getQuery(self,textfilter=None,facets=None,fq='', rows=10, _params=True, _conditions=True, _composition=False ):
-    
+
         studyfilter=''
         if self.settings['studyfilter'] != None:
             studyfilter = "AND {}".format(self.settings['studyfilter'])
@@ -174,7 +174,7 @@ class StudyDocuments:
         else:
             endpointfilter=''
 
-        if _params:    
+        if _params:
             paramsFilter = ' OR filter(type_s:params {})'.format(studyfilter)
         else:
             paramsFilter=''
@@ -192,19 +192,19 @@ class StudyDocuments:
             _fl="*"
         else:
             _fl=self.settings["fields"]
-            
+
         fl = '{},[child parentFilter=filter(type_s:substance) childFilter="filter(type_s:study {} {}) {} {} {}" limit=10000]'.format(_fl,studyfilter,endpointfilter,paramsFilter,conditionsFilter,compositionFilter)
 
         if textfilter==None:
             query='{!parent which=type_s:substance}'
-        else:    
+        else:
             query='{!parent which=type_s:substance}('+textfilter+')'
-            
+
         if facets is None:
             json_facet = ''
         else:
             json_facet = Facets().getNestedFacets(facets);
-            
+
         query={'q': query,'fq' : fq, "wt" : "json", 'fl' : fl, "json.facet": json_facet, 'rows': rows}
         return query
     def rows2frame(self,rows):
@@ -215,11 +215,11 @@ class StudyDocuments:
             for col in filter_col:
                 df[col] = df[col].astype('category')
         return df
-    
+
     def process_record(recordno,doc):
         if recordno==1:
                 logger.info(json.dumps(doc, indent=2))
-        
+
     def parse(self,docs,process=process_record):
         rows=[]
         logger= logging.getLogger()
@@ -228,13 +228,13 @@ class StudyDocuments:
         #print(docs)
 
         for doc in docs:
-            
+
             record=record+1
             if process!=None:
                 process(record,doc)
 
-            params = {}            
-            conditions = {} 
+            params = {}
+            conditions = {}
             cas = {}
             einecs = {}
 
@@ -258,24 +258,24 @@ class StudyDocuments:
 
 
 
-                if (childdoc['type_s'] == 'params'):    
-                    #display(childdoc)    
-                    params[childdoc['document_uuid_s']]= childdoc 
+                if (childdoc['type_s'] == 'params'):
+                    #display(childdoc)
+                    params[childdoc['document_uuid_s']]= childdoc
 
-                if (childdoc['type_s'] == 'conditions'):    
-                     conditions[childdoc['effectid_hs']]= childdoc 
+                if (childdoc['type_s'] == 'conditions'):
+                     conditions[childdoc['effectid_hs']]= childdoc
 
 
             for childdoc in doc['_childDocuments_']:
 
                 if (childdoc['type_s'] == 'study'):
 
-                    try: 
+                    try:
                         #print('{}\t{:s}\t{:s}\t{:s}'.format(record,doc['s_uuid_hs'],doc['substanceType_hs'],doc['name_hs']))
                         #print(json.dumps(childdoc, indent=2))
                         pass
                     except:
-                        pass                  
+                        pass
                     #print(doc['name_hs'],'\t',doc['substanceType_hs'])
                     quality_remark=[]
                     doc_uuid = childdoc['document_uuid_s']
@@ -299,25 +299,25 @@ class StudyDocuments:
                     effectendpoint_synonym_ss=[]
                     uncertainty=np.nan
                     uncertainty_type=''
-                    
+
                     textValue=''
-                                        
- 
+
+
                     try:
                         reliability = childdoc['reliability_s']
                     except :
-                        pass  
+                        pass
 
                     try:
                         studyResultType = childdoc['studyResultType_s']
                     except :
-                        pass        
+                        pass
 
                     try:
                         studyResultType = childdoc['studyResultType_s']
 
                     except :
-                        pass 
+                        pass
 
     #experimental result
     #no data
@@ -325,93 +325,93 @@ class StudyDocuments:
     #read-across based on grouping of substances (category approach)
     #read-across from supporting substance (structural analogue or surrogate)
     #(blank)
-                    #skip the most obvious crap    
+                    #skip the most obvious crap
                     try:
                         purposeFlag = childdoc['purposeFlag_s']
                     except :
-                        pass      
+                        pass
 
                     try:
                         s_uuid = childdoc['s_uuid_s']
                     except :
-                        pass                       
+                        pass
 
                     try:
                         document_uuid = childdoc['document_uuid_s']
                     except :
-                        pass              
-                    
+                        pass
+
                     try:
                         assay_uuid_s = childdoc['assay_uuid_s']
                     except :
                         assay_uuid_s = document_uuid
-                        
+
                     try:
                         investigation_uuid_s = childdoc['investigation_uuid_s']
                     except :
-                        investigation_uuid_s = assay_uuid_s                        
+                        investigation_uuid_s = assay_uuid_s
 
 
                     try:
                         reference = childdoc['reference_s']
                     except :
-                        pass 
+                        pass
 
                     try:
                         reference_year = childdoc['reference_year_s']
                     except :
-                        pass 
+                        pass
 
                     try:
                         reference_owner = childdoc['reference_owner_s']
                     except :
-                        pass                     
+                        pass
                     try:
                         effectendpoint = childdoc['effectendpoint_s']
                     except :
-                        pass  
+                        pass
                     try:
                         effectendpoint_type = childdoc['effectendpoint_type_s']
                     except :
-                        pass  
-                    
+                        pass
+
                     try:
                         effectendpoint_synonym_ss = childdoc['effectendpoint_synonym_ss']
                     except :
-                        pass                      
+                        pass
 
 
                     try:
                         guidance = str(childdoc['guidance_s'])
                     except :
-                        pass  
+                        pass
 
 
                     try:
                         loValue = childdoc['loValue_d']
                     except :
-                        pass          
+                        pass
 
                     try:
                         upValue = childdoc['upValue_d']
                     except :
                         pass
-                        
+
                     try:
                         uncertainty = childdoc['err_d']
                     except :
-                        pass    
+                        pass
                     try:
                         uncertainty_type = childdoc['errQualifier_s']
                     except :
-                        uncertainty_type=""                                                
-                        
+                        uncertainty_type=""
+
                     try:
                         textValue = childdoc['textValue_s']
                         #print(json.dumps(childdoc, indent=2))
 
                     except :
-                        textValue=""                        
+                        textValue=""
 
                     try:
                         loQualifier = childdoc['loQualifier_s']
@@ -426,10 +426,10 @@ class StudyDocuments:
                     try:
                         unit = childdoc['unit_s']
                     except :
-                        unit=""                    
+                        unit=""
                     if (unit is None or unit=='') and (not np.isnan(loValue) or not np.isnan(upValue)):
                         quality_remark.append("Missing unit")
-                    '''    
+                    '''
                     try:
                         exposure_h = conditions[study_id]['Exposure_h_s']
                     except :
@@ -453,23 +453,23 @@ class StudyDocuments:
                     except:
                         substancetype = None
 
-                         
+
                     row={
                          'db' : ''.join(doc['dbtag_hss']),
-                         'm.substance.name' : doc['name_hs'], 
-                         'm.public.name' : doc['publicname_hs'], 
-                         'm.materialprovider' : doc['owner_name_hs'], 
-                         #'m.substance.annotation' : ';'.join(doc['substance_annotation_hss']), 
-                         #'substance.uuid' : substance_uuid, 
-                         'm.substance.type' : substancetype, 
+                         'm.substance.name' : doc['name_hs'],
+                         'm.public.name' : doc['publicname_hs'],
+                         'm.materialprovider' : doc['owner_name_hs'],
+                         #'m.substance.annotation' : ';'.join(doc['substance_annotation_hss']),
+                         #'substance.uuid' : substance_uuid,
+                         'm.substance.type' : substancetype,
                          'p.oht.module' : childdoc['topcategory_s'],
                          'p.oht.section' : childdoc['endpointcategory_s'],
                          'p.guidance' : guidance,
-                         'p.reference' : reference,                         
-                         'p.reference_year' : reference_year,           
-                         'p.study_provider' : reference_owner,                                    
+                         'p.reference' : reference,
+                         'p.reference_year' : reference_year,
+                         'p.study_provider' : reference_owner,
                          'value.endpoint' : effectendpoint,
-                         'value.endpoint_synonym' : ';'.join(effectendpoint_synonym_ss),                         
+                         'value.endpoint_synonym' : ';'.join(effectendpoint_synonym_ss),
                          'value.endpoint_type' : effectendpoint_type,
                          'value.range.lo.qualifier' : loQualifier,
                          'value.range.up.qualifier' : upQualifier,
@@ -487,11 +487,11 @@ class StudyDocuments:
                          'xR.studyResultType' : studyResultType,
                          'xR.purposeFlag' : purposeFlag,
                          'xx.QualityRemark' : ';'.join(quality_remark),
-                         'uuid.substance' : s_uuid,                         
+                         'uuid.substance' : s_uuid,
                          'uuid.document' : document_uuid,
                          'uuid.assay' : assay_uuid_s,
                          'uuid.investigation' : investigation_uuid_s,
-                         
+
 
                         }
 
@@ -530,22 +530,22 @@ class StudyDocuments:
                                 value=np.nan
                             row[key] = value
                     except :
-                        pass 
+                        pass
 
                     for key,value in cas.items():
                         row['c.CAS']=key
                     for key,value in einecs.items():
-                        row['c.EINECS']=key    
+                        row['c.EINECS']=key
 
 
-                    rows.append(row)    
+                    rows.append(row)
         return (rows)
-    
+
 
 class Materials:
     def getQuery(self,query='*:*',facets=None,fq='', fl='*',rows=1000):
         query={'q': query,'fq' : fq, "wt" : "json", 'fl' : fl, 'rows': rows}
         return query
-         
 
-     
+
+

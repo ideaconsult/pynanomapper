@@ -25,7 +25,7 @@ def convert_units(value,from_units, to_units="nm",measures=None,debug=False):
             print(value,from_units,to_units)
             print(err)
         return None
-    
+
 Distance.ALIAS['\u00B5m'] = 'um'
 
 class Dose(BidimensionalMeasure):
@@ -35,7 +35,7 @@ class Dose(BidimensionalMeasure):
     ALIAS = {
         'l/kg' : 'l__kg'
     }
-    
+
 class Percent(MeasureBase):
     STANDARD_UNIT = 'percent'
     UNITS = {
@@ -49,7 +49,7 @@ class Percent(MeasureBase):
         '% DNA IN TAIL' : 'percent'
     }
     SI_UNITS = ['percent']
-    
+
 class Molar(MeasureBase):
     STANDARD_UNIT = 'mol'
     UNITS = {
@@ -76,13 +76,13 @@ class Concentration(BidimensionalMeasure):
         '\u00B5g/ml' : 'ug__ml',
         'microgram/l': 'ug__l',
         'micrograms per ml' : 'ug__ml',
-        'milligram per l' : 'mg__l', 
+        'milligram per l' : 'mg__l',
         'milligram / l' : 'mg__l',
         'micrograms per mL' : 'ug__ml'
     }
-    
-  
-    
+
+
+
 class ConcentrationMolar(BidimensionalMeasure):
     PRIMARY_DIMENSION = Molar
     REFERENCE_DIMENSION = Volume
@@ -95,24 +95,24 @@ class ConcentrationMolar(BidimensionalMeasure):
         '\u00B5mol/ml' : 'umol__ml',
         'micromol/l': 'umol__l',
         'micromol per ml' : 'umol__l',
-        'millimol per l' : 'mmol__l', 
+        'millimol per l' : 'mmol__l',
         'millimol / l' : 'mmol__l',
         'micromol per mL' : 'umol__ml'
-    }    
-    
-     
+    }
+
+
 
 def unitsdict(mypath,df):
     unit_dict={}
     file_ud=join(mypath,'unitdict.json')
     if isfile(file_ud):
         json_data=open(file_ud).read()
-        unit_dict = json.loads(json_data)  
+        unit_dict = json.loads(json_data)
 
     for unit in df.unit.unique():
         if not unit in unit_dict:
             unit_dict[unit]= unit
-        print('{:s}\t{:s}'.format(unit,unit_dict[unit]))        
+        print('{:s}\t{:s}'.format(unit,unit_dict[unit]))
     with open(file_ud, 'w') as fp:
         json.dump(unit_dict, fp, indent=2)
     return unit_dict
