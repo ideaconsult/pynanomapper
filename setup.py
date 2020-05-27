@@ -31,7 +31,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     keywords="enanomapper nanoinformatics cheminformatics ambit",
-    python_requires=">=3.6",
+    python_requires="~=3.5",
     packages=[
         "pynanomapper",
     ],
