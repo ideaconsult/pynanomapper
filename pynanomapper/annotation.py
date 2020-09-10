@@ -1,12 +1,15 @@
+from pathlib import Path
+
 from jproperties import Properties
-import os, os.path
+
 
 class Dictionary:
 
     def __init__(self,folder = './annotation/', topic='endpoint',verbose=True):
         self.lookup = Properties()
         self.topic=topic
-        self.folder = folder
+        self.folder = Path(folder)
+        self.folder.mkdir(parents=True, exist_ok=True)
         self.verbose=verbose
         self.loadDictionary()
 
@@ -16,7 +19,7 @@ class Dictionary:
             suffix = ".properties"
         else:
             suffix = ".terse.properties"
-        prop_file= self.folder + self.topic + suffix
+        prop_file= self.folder / self.topic + suffix
         try:
             with open(prop_file, "rb") as f:
                 self.lookup.load(f, "utf-8")
