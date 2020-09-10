@@ -19,7 +19,7 @@ class Dictionary:
             suffix = '.properties'
         else:
             suffix = '.terse.properties'
-        prop_file = self.folder / self.topic + suffix
+        prop_file = self.folder / (self.topic + suffix)
         try:
             with open(prop_file, 'rb') as f:
                 self.lookup.load(f, 'utf-8')
