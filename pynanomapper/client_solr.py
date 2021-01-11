@@ -240,7 +240,7 @@ class StudyDocuments:
             einecs = {}
             smiles = {}
             inchi = {}
-            ichikey = {}
+            inchikey = {}
             formula = {}
 
             if (not '_childDocuments_' in doc):
