@@ -238,6 +238,10 @@ class StudyDocuments:
             conditions = {}
             cas = {}
             einecs = {}
+            smiles = {}
+            inchi = {}
+            ichikey = {}
+            formula = {}
 
             if (not '_childDocuments_' in doc):
                 continue
@@ -256,8 +260,27 @@ class StudyDocuments:
                             einecs[ekey] =  childdoc['component_s']
                         except:
                             pass  # val does not exist at all
-
-
+                        try:
+                            ekey=childdoc['SMILES_s']
+                            smiles[ekey] =  childdoc['component_s']
+                        except:
+                            pass  # val does not exist at all
+                        try:
+                            ekey=childdoc['InChIKey_s']
+                            inchikey[ekey] =  childdoc['component_s']
+                        except:
+                            pass  # val does not exist at all                        
+                        try:
+                            ekey=childdoc['InChI_s']
+                            inchi[ekey] =  childdoc['component_s']
+                        except:
+                            pass  # val does not exist at all       
+                        try:
+                            ekey=childdoc['formula_s']
+                            formula[ekey] =  childdoc['component_s']
+                        except:
+                            pass  # val does not exist at all                         
+                        
 
                 if (childdoc['type_s'] == 'params'):
                     #display(childdoc)
@@ -537,7 +560,12 @@ class StudyDocuments:
                         row['c.CAS']=key
                     for key,value in einecs.items():
                         row['c.EINECS']=key
-
+                    for key,value in inchi.items():
+                        row['c.INCHI']=key
+                    for key,value in inchikey.items():
+                        row['c.INCHIKEY']=key                        
+                    for key,value in smiles.items():
+                        row['c.SMILES']=key                                                
 
                     rows.append(row)
         return (rows)
