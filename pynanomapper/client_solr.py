@@ -243,12 +243,8 @@ class StudyDocuments:
 
             params = {}
             conditions = {}
-            cas = {}
-            einecs = {}
-            smiles = {}
-            inchi = {}
-            inchikey = {}
-            formula = {}
+            
+            components = []
 
             if (not '_childDocuments_' in doc):
                 continue
@@ -256,38 +252,34 @@ class StudyDocuments:
 
             for childdoc in doc['_childDocuments_']:
                 if (childdoc['type_s'] == 'composition'):
-                    #if (childdoc['component_s'] == "CORE"):
+                    component = {}
+                    prefix="c{}.".format(len(components)+1);
+                    component[prefix+"type"] = childdoc['component_s']
                     try:
-                        caskey=childdoc['CASRN_s']
-                        cas[caskey] =  childdoc['component_s']
+                        component[prefix+"CAS"] = childdoc['CASRN_s']
                     except:
                         pass  # val does not exist at all
                     try:
-                        ekey=childdoc['EINECS_s']
-                        einecs[ekey] =  childdoc['component_s']
+                        component[prefix+"EINECS"] =childdoc['EINECS_s']
                     except:
                         pass  # val does not exist at all
                     try:
-                        ekey=childdoc['SMILES_s']
-                        smiles[ekey] =  childdoc['component_s']
+                        component[prefix+"SMILES"] =childdoc['SMILES_s']
                     except:
                         pass  # val does not exist at all
                     try:
-                        ekey=childdoc['InChIKey_s']
-                        inchikey[ekey] =  childdoc['component_s']
+                        component[prefix+"InChIKey"] =childdoc['InChIKey_s']
                     except:
                         pass  # val does not exist at all                        
                     try:
-                        ekey=childdoc['InChI_s']
-                        inchi[ekey] =  childdoc['component_s']
+                        component[prefix+"InChI"] =childdoc['InChI_s']
                     except:
                         pass  # val does not exist at all       
                     try:
-                        ekey=childdoc['formula_s']
-                        formula[ekey] =  childdoc['component_s']
+                        component[prefix+"formula"] =childdoc['formula_s']
                     except:
                         pass  # val does not exist at all                         
-                        
+                    components.append(component)    
 
                 if (childdoc['type_s'] == 'params'):
                     #display(childdoc)
@@ -563,16 +555,9 @@ class StudyDocuments:
                     except :
                         pass
 
-                    for key,value in cas.items():
-                        row['c.CAS']=key
-                    for key,value in einecs.items():
-                        row['c.EINECS']=key
-                    for key,value in inchi.items():
-                        row['c.INCHI']=key
-                    for key,value in inchikey.items():
-                        row['c.INCHIKEY']=key                        
-                    for key,value in smiles.items():
-                        row['c.SMILES']=key                                                
+                    for component in components:
+                        row.update(component)
+                    
                     
                     rows.append(row)
         return (rows)
