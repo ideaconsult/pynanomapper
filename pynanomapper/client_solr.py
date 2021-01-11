@@ -151,6 +151,8 @@ class StudyDocuments:
         self.settings['query_organism'] = None
         self.settings['endpointfilter'] = None
         self.settings['query_guidance'] = None
+        self.settings['compositionfilter'] = " (component_s:CORE OR component_s:CONSTITUENT) "
+         
         self.settings['fields'] = "dbtag_hss,name_hs,publicname_hs,substanceType_hs,owner_name_hs,s_uuid_hs,substance_annotation_hss"
 
     def getSettings(self):
@@ -174,6 +176,11 @@ class StudyDocuments:
             endpointfilter = "AND {}".format(self.settings['endpointfilter'])
         else:
             endpointfilter=''
+            
+        if self.settings['compositionfilter'] != None:
+            compositionfilter = "AND {}".format(self.settings['compositionfilter'])
+        else:
+            compositionfilter=''            
 
         if _params:
             paramsFilter = ' OR filter(type_s:params {})'.format(studyfilter)
@@ -184,7 +191,7 @@ class StudyDocuments:
         else:
             conditionsFilter=''
         if _composition:
-            compositionFilter='OR filter(type_s:composition AND component_s:CORE)'
+            compositionFilter=' OR filter(type_s:composition {})'.format(compositionfilter)
         else:
             compositionFilter=''
 
@@ -249,37 +256,37 @@ class StudyDocuments:
 
             for childdoc in doc['_childDocuments_']:
                 if (childdoc['type_s'] == 'composition'):
-                    if (childdoc['component_s'] == "CORE"):
-                        try:
-                            caskey=childdoc['CASRN_s']
-                            cas[caskey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all
-                        try:
-                            ekey=childdoc['EINECS_s']
-                            einecs[ekey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all
-                        try:
-                            ekey=childdoc['SMILES_s']
-                            smiles[ekey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all
-                        try:
-                            ekey=childdoc['InChIKey_s']
-                            inchikey[ekey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all                        
-                        try:
-                            ekey=childdoc['InChI_s']
-                            inchi[ekey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all       
-                        try:
-                            ekey=childdoc['formula_s']
-                            formula[ekey] =  childdoc['component_s']
-                        except:
-                            pass  # val does not exist at all                         
+                    #if (childdoc['component_s'] == "CORE"):
+                    try:
+                        caskey=childdoc['CASRN_s']
+                        cas[caskey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all
+                    try:
+                        ekey=childdoc['EINECS_s']
+                        einecs[ekey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all
+                    try:
+                        ekey=childdoc['SMILES_s']
+                        smiles[ekey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all
+                    try:
+                        ekey=childdoc['InChIKey_s']
+                        inchikey[ekey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all                        
+                    try:
+                        ekey=childdoc['InChI_s']
+                        inchi[ekey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all       
+                    try:
+                        ekey=childdoc['formula_s']
+                        formula[ekey] =  childdoc['component_s']
+                    except:
+                        pass  # val does not exist at all                         
                         
 
                 if (childdoc['type_s'] == 'params'):
@@ -566,7 +573,7 @@ class StudyDocuments:
                         row['c.INCHIKEY']=key                        
                     for key,value in smiles.items():
                         row['c.SMILES']=key                                                
-
+                    
                     rows.append(row)
         return (rows)
 
