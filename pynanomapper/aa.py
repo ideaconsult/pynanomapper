@@ -42,7 +42,7 @@ def operationAuth(config,path='/select',method='get',auth="enmKeyAuth"):
 
 def parseOpenAPI3(url='https://search.data.enanomapper.net/api-docs/', config='solr.yaml',auth="enmKeyAuth"):
     apikey=None
-    config = yaml.load(requests.get(url+config).text)
+    config = yaml.load(requests.get(url+config).text, Loader=yaml.FullLoader)
     config_servers = json_normalize(config['servers'], None, ['url'])
     if 'securitySchemes' in config['components']:
         config_security = json_normalize(config['components']['securitySchemes'], None, [])
