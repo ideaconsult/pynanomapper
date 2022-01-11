@@ -7,7 +7,7 @@ with open("README.md", "r") as fs:
 
 setup(
     name="pynanomapper",
-    version="1.0.4",
+    version="1.0.5",
     author="Nina JELIAZKOVA",
     author_email="jeliazkova.nina@gmail.com",
     description="eNanoMapper API client",
