@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import logging
 from pandas.io.json import json_normalize
+import re
 global logger
 logger = logging.getLogger()
 import json
@@ -522,21 +523,22 @@ class StudyDocuments:
                         for condition in conditions[study_id]:
                             if condition == "type_s" or condition=="document_uuid_s" or condition=="id" or condition=="topcategory_s" or condition=="endpointcategory_s":
                                 continue
-                            row["x.conditions." + condition.replace("_s","")] = conditions[study_id][condition]
+                            
+                            row["x.conditions." + re.sub("_s$","",condition)] = conditions[study_id][condition]
                     except:
                         pass
                     try:
                         for prm in params[document_uuid]:
                             if prm == "type_s" or prm=="document_uuid_s" or prm=="id" or prm=="topcategory_s" or prm=="endpointcategory_s":
                                 continue
-                            row["x.params."+prm.replace("_s","")] = params[document_uuid][prm]
+                            row["x.params."+re.sub("_s$","",prm)] = params[document_uuid][prm]
                     except:
                         pass
 
                     try:
                         fields = self.settings["fields"]["conditions"]
                         for field in fields:
-                            key="x.conditions." + field.replace("_s", "")
+                            key="x.conditions." + re.sub("_s$","",field)
                             value = conditions[study_id][field]
                             if pd.isna(value):
                                 value=np.nan
@@ -547,7 +549,7 @@ class StudyDocuments:
                     try:
                         fields = self.settings["fields"]["params"]
                         for field in fields:
-                            key="x.params."+field.replace("_s", "")
+                            key="x.params." + re.sub("_s$","",field)
                             value = params[doc_uuid][field]
                             if pd.isna(value):
                                 value=np.nan
