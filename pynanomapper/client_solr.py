@@ -20,6 +20,11 @@ def get(service_uri,query,auth=None):
 
 
 class Facets:
+    def __init__(self):
+        self.set_annotation_folder()
+
+    def set_annotation_folder(self,annotation_folder='./annotation/'):
+        self.annotation_folder = annotation_folder;
 
     def getQuery(self,query='*:*',facets=["endpointcategory_s","effectendpoint_s","unit_s"],fq='', rows=0):
         json_facet = self.getNestedFacets(facets);
@@ -121,20 +126,20 @@ class Facets:
             this.parse(response_json['facets'],prefix=">",process=process)
             df = pd.DataFrame(_stats,columns=colnames).drop("Z", axis=1)
             if "substanceType_s" in df.columns:
-                a = annotation.DictionarySubstancetypes(verbose=False)
+                a = annotation.DictionarySubstancetypes(folder=this.annotation_folder,verbose=False)
                 df[ 'substanceType_name']=df[ 'substanceType_s'].apply(a.annotate)
             if "substanceType_hs" in df.columns:
-                a = annotation.DictionarySubstancetypes(verbose=False)
+                a = annotation.DictionarySubstancetypes(folder=this.annotation_folder,verbose=False)
                 a.verbose=False
                 df[ 'substanceType_name']=df[ 'substanceType_hs'].apply(a.annotate)
             if "endpointcategory_s" in df.columns:
-                a = annotation.DictionaryEndpointCategory()
+                a = annotation.DictionaryEndpointCategory(folder=this.annotation_folder)
                 df[ 'endpointcategory_term']=df[ 'endpointcategory_s'].apply(a.annotate)
-                a = annotation.DictionaryEndpointCategoryNames()
+                a = annotation.DictionaryEndpointCategoryNames(folder=this.annotation_folder)
                 df[ 'endpointcategory_name']=df[ 'endpointcategory_s'].apply(a.annotate)
 
             if "method_term" in df.columns:
-                a = annotation.DictionaryAssays()
+                a = annotation.DictionaryAssays(folder=this.annotation_folder)
                 df[ 'method_term']=df[method_field].apply(a.annotate)
             return (df)
         else:
@@ -389,7 +394,8 @@ class StudyDocuments:
                     try:
                         reference_owner = childdoc['reference_owner_s']
                     except :
-                        pass
+                        reference_owner = None
+                        
                     try:
                         effectendpoint = childdoc['effectendpoint_s']
                     except :

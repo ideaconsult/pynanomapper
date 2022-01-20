@@ -50,40 +50,40 @@ class Dictionary:
 class DictionaryEndpoints(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='endpoint'):
-        super().__init__(folder='./annotation/', topic='endpoint', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionaryAssays(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='assays'):
-        super().__init__(folder='./annotation/', topic='assays', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionaryCells(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='cells'):
-        super().__init__(folder='./annotation/', topic='cells', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionaryEndpointCategory(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='endpointcategory'):
-        super().__init__(folder='./annotation/', topic='endpointcategory', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionaryEndpointCategoryNames(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='endpointcategory_names'):
-        super().__init__(folder='./annotation/', topic='endpointcategory_names', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionarySpecies(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='species'):
-        super().__init__(folder='./annotation/', topic='species', verbose=True)
+        super().__init__(folder=folder, topic=topic, verbose=True)
 
 
 class DictionarySubstancetypes(Dictionary):
 
     def __init__(self, folder='./annotation/', topic='substancetype', verbose=True):
-        super().__init__(folder='./annotation/', topic='substancetype', verbose=verbose)
+        super().__init__(folder=folder, topic=topic, verbose=verbose)
