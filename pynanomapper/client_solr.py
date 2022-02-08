@@ -51,18 +51,31 @@ class Facets:
                 continue
             else:
                 key=f
-                for bucket in facets[f]['buckets']:
-                    self.parse(bucket,key,prefix+"\t",process,(*_tuple,val))
-                if facets[f]['missing']['count'] >0:
-                    self.parse(facets[f]['missing'],key,prefix+"\t",process,(*_tuple,val))
+                if isinstance(facets[f], dict):
+                    if 'buckets' in facets[f]:
+                        for bucket in facets[f]['buckets']:
+                            self.parse(bucket,key,prefix+"\t",process,(*_tuple,val))
+                    if 'missing' in facets[f]:
+                        if facets[f]['missing']['count'] >0:
+                            self.parse(facets[f]['missing'],key,prefix+"\t",process,(*_tuple,val))
+                else:
+                    nval = facets[f]
+                    if process is None:
+                        print("{}\t{}'{}'\t{}\t{}".format(prefix,_tuple,nval,count,key))
+                    else:
+                        process(prefix,nval,count,key,(*_tuple,val))                    
 
     def getFacet(self,field="endpointcategory_s",n=1,nested=None):
         fieldname="field{}".format(n)
+        type_facet = "{}:{},{}:{} ,limit : -1, mincount:1, missing:true ".format("type","terms","field",field)
         if nested==None:
             nested_facet=""
+            if field.endswith(")"):
+                type_facet = field            
+                return "{" + fieldname + ": '"+ type_facet +  "'}"
         else:
             nested_facet= ", facet:" + nested
-        return "{" + fieldname + ": {"+ "{}:{},{}:{} ,limit : -1, mincount:1, missing:true ".format("type","terms","field",field) +nested_facet + "}}"
+        return "{" + fieldname + ": {"+ type_facet +nested_facet + "}}"
 
 
     def getNestedFacets(self,facets=["endpointcategory_s","effectendpoint_s","unit_s"]):
@@ -113,6 +126,9 @@ class Facets:
             if len(_tuple)==len(fields):
                 _tuple = (*_tuple,val,count)
                 _stats.append(_tuple)
+            else:
+                #print(prefix,val,count,key,_tuple)
+                pass
         q=this.getQuery(query=query,facets=fields,fq=fq)
         if log_query!=None:
             log_query(q)
