@@ -63,7 +63,7 @@ class Facets:
                     if process is None:
                         print("{}\t{}'{}'\t{}\t{}".format(prefix,_tuple,nval,count,key))
                     else:
-                        process(prefix,nval,count,key,(*_tuple,val))                    
+                        process(prefix,nval,count,key,(*_tuple,val))
 
     def getFacet(self,field="endpointcategory_s",n=1,nested=None):
         fieldname="field{}".format(n)
@@ -71,7 +71,7 @@ class Facets:
         if nested==None:
             nested_facet=""
             if field.endswith(")"):
-                type_facet = field            
+                type_facet = field
                 return "{" + fieldname + ": '"+ type_facet +  "'}"
         else:
             nested_facet= ", facet:" + nested
@@ -174,7 +174,7 @@ class StudyDocuments:
         self.settings['endpointfilter'] = None
         self.settings['query_guidance'] = None
         self.settings['compositionfilter'] = " (component_s:CORE OR component_s:CONSTITUENT) "
-         
+
         self.settings['fields'] = "dbtag_hss,name_hs,publicname_hs,substanceType_hs,owner_name_hs,s_uuid_hs,substance_annotation_hss"
 
     def getSettings(self):
@@ -198,11 +198,11 @@ class StudyDocuments:
             endpointfilter = "AND {}".format(self.settings['endpointfilter'])
         else:
             endpointfilter=''
-            
+
         if self.settings['compositionfilter'] != None:
             compositionfilter = "AND {}".format(self.settings['compositionfilter'])
         else:
-            compositionfilter=''            
+            compositionfilter=''
 
         if _params:
             paramsFilter = ' OR filter(type_s:params {})'.format(studyfilter)
@@ -265,7 +265,7 @@ class StudyDocuments:
 
             params = {}
             conditions = {}
-            
+
             components = []
 
             if (not '_childDocuments_' in doc):
@@ -292,16 +292,16 @@ class StudyDocuments:
                     try:
                         component[prefix+"InChIKey"] =childdoc['InChIKey_s']
                     except:
-                        pass  # val does not exist at all                        
+                        pass  # val does not exist at all
                     try:
                         component[prefix+"InChI"] =childdoc['InChI_s']
                     except:
-                        pass  # val does not exist at all       
+                        pass  # val does not exist at all
                     try:
                         component[prefix+"formula"] =childdoc['formula_s']
                     except:
-                        pass  # val does not exist at all                         
-                    components.append(component)    
+                        pass  # val does not exist at all
+                    components.append(component)
 
                 if (childdoc['type_s'] == 'params'):
                     #display(childdoc)
@@ -411,7 +411,7 @@ class StudyDocuments:
                         reference_owner = childdoc['reference_owner_s']
                     except :
                         reference_owner = None
-                        
+
                     try:
                         effectendpoint = childdoc['effectendpoint_s']
                     except :
@@ -499,12 +499,17 @@ class StudyDocuments:
                     except:
                         substancetype = None
 
+                    owner_name = None
+                    try:
+                        owner_name = doc['owner_name_hs']
+                    except:
+                        pass
 
                     row={
                          'db' : ''.join(doc['dbtag_hss']),
                          'm.substance.name' : doc['name_hs'],
                          'm.public.name' : doc['publicname_hs'],
-                         'm.materialprovider' : doc['owner_name_hs'],
+                         'm.materialprovider' : owner_name,
                          #'m.substance.annotation' : ';'.join(doc['substance_annotation_hss']),
                          #'substance.uuid' : substance_uuid,
                          'm.substance.type' : substancetype,
@@ -545,7 +550,7 @@ class StudyDocuments:
                         for condition in conditions[study_id]:
                             if condition == "type_s" or condition=="document_uuid_s" or condition=="id" or condition=="topcategory_s" or condition=="endpointcategory_s":
                                 continue
-                            
+
                             row["x.conditions." + re.sub("_s$","",condition)] = conditions[study_id][condition]
                     except:
                         pass
@@ -581,8 +586,8 @@ class StudyDocuments:
 
                     for component in components:
                         row.update(component)
-                    
-                    
+
+
                     rows.append(row)
         return (rows)
 
