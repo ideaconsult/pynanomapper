@@ -336,6 +336,7 @@ class StudyDocuments:
                     effectendpoint = ''
                     effectendpoint_type = ''
                     studyResultType=''
+                    reference=None
                     reference_year=''
                     s_uuid=''
                     document_uuid=''
@@ -400,12 +401,12 @@ class StudyDocuments:
                     try:
                         reference = childdoc['reference_s']
                     except :
-                        pass
+                        reference = None
 
                     try:
                         reference_year = childdoc['reference_year_s']
                     except :
-                        pass
+                        reference_year = None
 
                     try:
                         reference_owner = childdoc['reference_owner_s']
@@ -505,10 +506,16 @@ class StudyDocuments:
                     except:
                         pass
 
+                    publicname = None
+                    try:
+                        publicname = doc['publicname_hs']
+                    except:
+                        pass
+
                     row={
                          'db' : ''.join(doc['dbtag_hss']),
                          'm.substance.name' : doc['name_hs'],
-                         'm.public.name' : doc['publicname_hs'],
+                         'm.public.name' : publicname,
                          'm.materialprovider' : owner_name,
                          #'m.substance.annotation' : ';'.join(doc['substance_annotation_hss']),
                          #'substance.uuid' : substance_uuid,
