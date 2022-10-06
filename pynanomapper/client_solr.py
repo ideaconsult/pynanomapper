@@ -1,3 +1,4 @@
+from http.client import HTTPException
 import requests
 import yaml
 import pandas as pd
@@ -18,6 +19,14 @@ def get(service_uri,query,auth=None):
     r = requests.get(service_uri + "/select",params=query, auth=auth)
     return r
 
+def knn_query(solr_field,topk,vector):
+    query = "!knn f={} topK={}".format(solr_field,topk)
+    return "{"+query+"}[" + ','.join(map(str, vector)) + "]"
+
+def print_docs(res):
+    if not (res is None):
+        for doc in res["response"]["docs"]:
+            print(' '.join([f'{key}: {value}' for key, value in doc.items()]))
 
 class Facets:
     def __init__(self):
@@ -605,4 +614,67 @@ class Materials:
         return query
 
 
+class IndexSolr:
+    @staticmethod
+    def substance_entry(dbtag,name,publicname,ownername,substanceType,uuid, vectors = [{"dense_256" : None}] ):
+        tmp = {
+            "id" : uuid,
+            "content_hss":[],
+            "dbtag_hss":[],
+            "name_hs": name,
+            "publicname_hs": publicname,
+            "owner_name_hs": ownername,
+            "substanceType_hs": substanceType,
+            "s_uuid_hs":uuid,
+            "type_s":"substance",
+            "SUMMARY.RESULTS_hss":[],
+            "SUMMARY.REFS_hss":[],
+            "SUMMARY.REFOWNERS_hss":[]
+        }
+        tmp['dbtag_hss'].append(dbtag)
+        if vectors is None:
+            return tmp
+        for solr_field in vectors:
+            try:
+                if not (vectors[solr_field] is None):
+                    tmp[solr_field] = vectors[solr_field].tolist()
+            except:
+                pass
+        return tmp
+
+    @staticmethod
+    def df2solr(row,fields=
+                {"dbtag":"dbtag","uuid":"uuid",
+                "name":"name","publicname":"publicname","ownername":"ownername","substanceType":"substanceType"},
+                vector_fields = [{"dense_256" : (0,256)}]):
+
+        if not (vector_fields is None):
+            for vector_fields in vector_fields:
+                entry = vector_fields[vector_fields]
+                vector_fields[vector_fields] = row[entry[0]:entry[1]].values
+
+        values = {}
+        for field in fields:
+            try:
+                values[field] = row[fields[field]]
+            except:
+                values[field] = ""
+        return IndexSolr.substance_entry(values["dbtag"],values["name"],values["publicname"],values["ownername"],values["substanceType"],values["uuid"],vector_fields)
+
+    @staticmethod
+    def submit_dataframe(df, solr_url, auth_obj = None,delete = True, commit = True):
+        tmp = df.apply(IndexSolr.df2solr,axis=1)
+        return IndexSolr.submit_json(tmp.tmp.tolist(), solr_url, auth_obj = auth_obj,delete = delete, commit = commit)
+
+    @staticmethod
+    def submit_json(json, solr_url, auth_obj = None,delete = True, commit = True):
+        if delete:
+            res = requests.get("{}/update?commit=true".format(solr_url), json = {"delete" : { "query" : "*:*"}}, auth = auth_obj)
+            if res.status_code != 200:
+                raise HTTPException(status_code=res.status_code, detail=res.text)
+        res = requests.post("{}/update?commit=true".format(solr_url),json=json, auth = auth_obj)
+        if res.status_code != 200:
+                raise HTTPException(status_code=res.status_code, detail=res.text)
+        else:
+            return res.json()
 

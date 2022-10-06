@@ -23,6 +23,7 @@ class AmbitAPIKEYAuth(AuthBase):
 
 
 class GraviteeAuth(AuthBase):
+
     def __init__(self, apikey=None):
         self.apikey = apikey
 
@@ -33,10 +34,17 @@ class GraviteeAuth(AuthBase):
     def setKey(self, apikey):
         self.apikey=apikey
 
+class BearerAuth(AuthBase):
+    """Authorization: Bearer XXXX"""
+    def __init__(self, token=None):
+        self.token = token
 
-def operationAuth(config,path='/select',method='get',auth="enmKeyAuth"):
-    operation = config['paths'][path]['get']['security']
-    return [apikey for item in operation if auth in item]
+    def __call__(self, r):
+        r.headers['Authorization'] = "Bearer {}".format(self.token)
+        return r
+
+    def setKey(self, token):
+        self.apikey=token
 
 
 
@@ -64,5 +72,4 @@ def parseOpenAPI3(url='https://search.data.enanomapper.net/api-docs/', config='s
         msg = 'Enter AMBIT API Key'
 
     return config,config_servers, apikey, auth_class, msg
-
 

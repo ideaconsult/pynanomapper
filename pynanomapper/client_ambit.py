@@ -126,6 +126,7 @@ class AMBITQueryCompound(AMBITResource):
 
 
 
+
 class AMBITFacets(AMBITResource):
 
     def __init__(self,root_uri=_default_ambit,resource="/query",key="/study"):
@@ -133,4 +134,13 @@ class AMBITFacets(AMBITResource):
     def parse(self,response):
         return response['facet']
 
+
+#curl -X POST "https://api.ideaconsult.net/harmless/enm/harmless/nmparser" -H "Accept:application/json" -H "X-Gravitee-Api-Key: 1942a33b-d71e-466c-8c06-c0147b90d878"
+
+class AMBITParser(AMBITResource):
+
+    def __init__(self,root_uri=_default_ambit,resource="/nmparser",key=""):
+         super().__init__(root_uri,resource,key)
+    def parse(self,response):
+        return response
 
