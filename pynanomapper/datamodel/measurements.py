@@ -36,7 +36,7 @@ class EffectRecord(BaseModel):
     loValue: Optional[float] = None
     upQualifier: Optional[str] = None
     upValue: Optional[float] = None
-    conditions: Dict[str, Union[str, Value]]
+    conditions: Dict[str, Union[str, Value, None]]
     textValue: Optional[str] = None
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
@@ -123,7 +123,7 @@ class ProtocolApplication(BaseModel):
     #reliability: Optional[ReliabilityParams]
     interpretationResult: Optional[str] = None
     interpretationCriteria: Optional[str] = None
-    parameters: Dict[str, Union[str, Value]]
+    parameters: Dict[str, Union[str, Value, None]]
     citation: Optional[Citation]
     effects: List[EffectRecord]
     owner : Optional[Owner]
