@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 import typing
 from typing import Dict, Optional, Union
+import json
 
  #The Optional type is used to indicate that a field can have a value of either the specified type or None.
 class Value(BaseModel):
@@ -52,6 +53,15 @@ class EffectRecord(BaseModel):
         if self.endpointSynonyms:
             return ", ".join(self.endpointSynonyms)
         return ""
+
+    def to_json(self):
+        def effect_record_encoder(obj):
+            if isinstance(obj, List):
+                return [item.__dict__ for item in obj]
+            return obj
+
+        return json.dumps(self.__dict__, default=effect_record_encoder)
+
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -130,6 +140,15 @@ class ProtocolApplication(BaseModel):
                     parameters[key] = Value(**value)
         return cls(**data)
 
+    def to_json(self):
+        def protocol_application_encoder(obj):
+            if isinstance(obj, Value):
+                return obj.__dict__
+            return obj
+
+        return json.dumps(self.__dict__, default=protocol_application_encoder)
+
+
 # parsed_json["substance"][0]
 # s = Study(**sjson)
 class Study(BaseModel):
@@ -151,8 +170,39 @@ class SubstanceRecord(BaseModel):
     referenceSubstance: Optional[ReferenceSubstance] = None
     # composition : List[]
     # externalIdentifiers : List[]
-    study: List[ProtocolApplication]
+    study: Optional[List[ProtocolApplication]] = None
+
+    def to_json(self):
+        def substance_record_encoder(obj):
+            if isinstance(obj, List):
+                return [item.__dict__ for item in obj]
+            return obj.__dict__
+
+        return json.dumps(self, default=substance_record_encoder)
 
 # s = Substances(**parsed_json)
+
 class Substances(BaseModel):
+    """
+    Example:
+        # Creating an instance of Substances, with studies
+        # Parse json retrieved from AMBIT services
+        from  pynanomapper.datamodel.measurements import Substances
+        _p = Substances(**parsed_json)
+        for substance in _p.substance:
+            papps = substance.study
+            for papp in papps:
+                print(papp.protocol)
+                print(papp.parameters)
+                for e in papp.effects:
+                    print(e)
+
+    """
     substance: List[SubstanceRecord]
+    def to_json(self):
+        def substances_encoder(obj):
+            if isinstance(obj, Substances):
+                return obj.substance
+            return obj.__dict__
+
+        return json.dumps(self, default=substances_encoder)
