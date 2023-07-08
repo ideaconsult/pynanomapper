@@ -152,6 +152,19 @@ class ProtocolApplication(BaseModel):
 # parsed_json["substance"][0]
 # s = Study(**sjson)
 class Study(BaseModel):
+    """
+    Example:
+        # Creating an instance of Substances, with studies
+        # Parse json retrieved from AMBIT services
+        from  pynanomapper.datamodel.measurements import Study
+        import requests
+        url = https://apps.ideaconsult.net/gracious/substance/GRCS-7bd6de68-a312-3254-8b3f-9f46d6976ce6/study?media=application/json
+        response = requests.get(url)
+        parsed_json = response.json()
+        papps = Study(**parsed_json)
+        for papp in papps:
+            print(papp)
+    """
     study: List[ProtocolApplication]
 
 class ReferenceSubstance(BaseModel):
