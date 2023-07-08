@@ -2,6 +2,7 @@ import h5py
 import numpy as np
 import json
 import traceback
+import pandas as pd
 
 class AmbitParser:
 
@@ -65,7 +66,7 @@ class AmbitParser:
     def read_attributes(h5file, h5path, ambitobj, props=['ownerName', "substanceType", "name", "publicname"]):
         for a in props:
             try:
-                ambitobj[a] = parse_attribute_value(h5file[h5path].attrs[a])
+                ambitobj[a] = AmbitParser.parse_attribute_value(h5file[h5path].attrs[a])
             except Exception as err:
                 print(err, h5path, ambitobj, props)
 
@@ -130,7 +131,7 @@ class AmbitParser:
             substance = {}
             substance['i5uuid'] = _uuid
             substance['study'] = []
-            read_attributes(h5file, "/substance/{}".format(_uuid), substance,
+            AmbitParser.read_attributes(h5file, "/substance/{}".format(_uuid), substance,
                         props=["ownerName", "substanceType", "name", "publicname"])
             substances[_uuid] = substance
 
@@ -138,18 +139,18 @@ class AmbitParser:
             study = { "owner" : { "substance" : {} , "company" : {}}, "citation" : {}, "protocol" : { "category": {}} , "parameters" : [], "effects" : []}
             study['uuid'] = _uuid
             h5path = "/study/{}".format(study['uuid'])
-            read_attributes(h5file, "{}/owner/substance".format(h5path), study['owner']['substance'], props=['uuid'])
+            AmbitParser.read_attributes(h5file, "{}/owner/substance".format(h5path), study['owner']['substance'], props=['uuid'])
             substances[study['owner']['substance']["uuid"]]["study"].append(study)
-            read_attributes(h5file, h5path, study, props=['investigation_uuid', "assay_uuid"])
-            read_attributes(h5file, "{}/owner/company".format(h5path), study['owner']['company'], props=['uuid', 'name'])
+            AmbitParser.read_attributes(h5file, h5path, study, props=['investigation_uuid', "assay_uuid"])
+            AmbitParser.read_attributes(h5file, "{}/owner/company".format(h5path), study['owner']['company'], props=['uuid', 'name'])
 
-            read_attributes(h5file, "{}/citation".format(h5path), study['citation'], props=['title', 'year', 'owner'])
-            read_attributes(h5file, "{}/protocol".format(h5path), study['protocol'], props=['topcategory', 'endpoint','guideline'])
-            read_attributes(h5file, "{}/protocol".format(h5path), study['protocol']['category'], props=['code', 'title', 'term'])
+            AmbitParser.read_attributes(h5file, "{}/citation".format(h5path), study['citation'], props=['title', 'year', 'owner'])
+            AmbitParser.read_attributes(h5file, "{}/protocol".format(h5path), study['protocol'], props=['topcategory', 'endpoint','guideline'])
+            AmbitParser.read_attributes(h5file, "{}/protocol".format(h5path), study['protocol']['category'], props=['code', 'title', 'term'])
             params = h5file["{}/parameters".format(h5path)].attrs
             for attr in params:
                 param = {}
-                param[attr] = parse_attribute_value(params[attr])
+                param[attr] = AmbitParser.parse_attribute_value(params[attr])
                 study['parameters'].append(param)
             results = h5file["{}/results".format(h5path)]
             effects = []
@@ -166,7 +167,7 @@ class AmbitParser:
                             effect[attr] = value
                         else:
 
-                            effect["conditions"].append({attr : parse_attribute_value(value)});
+                            effect["conditions"].append({attr : AmbitParser.parse_attribute_value(value)});
                     study["effects"].append(effect)
 
 
@@ -181,19 +182,19 @@ class AmbitParser:
         for substance in datamodel['substance']:
 
             # print(substance['ownerName'], substance["substanceType"], substance["name"], substance["publicname"])
-            write_attributes(h5file, "/substance/{}".format(
+            AmbitParser.write_attributes(h5file, "/substance/{}".format(
                         substance['i5uuid']), substance,
                         props=["ownerName", "substanceType", "name", "publicname"])
             results = {}
             for study in substance['study']:
-                write_attributes(h5file, "/study/{}".format(study['uuid']), study, props=['investigation_uuid', "assay_uuid"])
-                write_attributes(h5file, "/study/{}/owner/substance".format(study['uuid']), study['owner']['substance'], props=['uuid'])
-                write_attributes(h5file, "/study/{}/owner/company".format(study['uuid']), study['owner']['company'], props=['uuid', 'name'])
-                write_attributes(h5file, "/study/{}/citation".format(study['uuid']), study['citation'], props=['title', 'year', 'owner'])
-                write_attributes(h5file, "/study/{}/protocol".format(study['uuid']), study['protocol'], props=['topcategory', 'endpoint','guideline'])
-                write_attributes(h5file, "/study/{}/protocol".format(study['uuid']), study['protocol']['category'], props=['code', 'title', 'term'])
+                AmbitParser.write_attributes(h5file, "/study/{}".format(study['uuid']), study, props=['investigation_uuid', "assay_uuid"])
+                AmbitParser.write_attributes(h5file, "/study/{}/owner/substance".format(study['uuid']), study['owner']['substance'], props=['uuid'])
+                AmbitParser.write_attributes(h5file, "/study/{}/owner/company".format(study['uuid']), study['owner']['company'], props=['uuid', 'name'])
+                AmbitParser.write_attributes(h5file, "/study/{}/citation".format(study['uuid']), study['citation'], props=['title', 'year', 'owner'])
+                AmbitParser.write_attributes(h5file, "/study/{}/protocol".format(study['uuid']), study['protocol'], props=['topcategory', 'endpoint','guideline'])
+                AmbitParser.write_attributes(h5file, "/study/{}/protocol".format(study['uuid']), study['protocol']['category'], props=['code', 'title', 'term'])
                 for param in study['parameters']:
-                    write_attributes(h5file, "/study/{}/parameters".format(study['uuid']), study['parameters'], props= [ param])
+                    AmbitParser.write_attributes(h5file, "/study/{}/parameters".format(study['uuid']), study['parameters'], props= [ param])
 
 
 
