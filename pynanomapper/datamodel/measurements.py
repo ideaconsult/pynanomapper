@@ -1,7 +1,6 @@
 from typing import List, TypeVar, Generic
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 from enum import Enum
-from pydantic import BaseModel
 
 import typing
 from typing import Dict, Optional, Union
@@ -24,9 +23,9 @@ class EndpointCategory(BaseModel):
     title: Optional[str]
 
 class Protocol(BaseModel):
-    topcategory: str
-    category: EndpointCategory
-    endpoint: str
+    topcategory: Optional[str] = None
+    category: Optional[EndpointCategory] = None
+    endpoint: Optional[str] = None
     guideline: List[str] = None
 
 class EffectRecord(BaseModel):
@@ -36,7 +35,7 @@ class EffectRecord(BaseModel):
     loValue: Optional[float] = None
     upQualifier: Optional[str] = None
     upValue: Optional[float] = None
-    conditions: Dict[str, Union[str, Value, None]]
+    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
     textValue: Optional[str] = None
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
@@ -44,6 +43,13 @@ class EffectRecord(BaseModel):
     endpointGroup: Optional[int] = None
     endpointSynonyms: List[str] = None
     sampleID: Optional[str] = None
+
+    @classmethod
+    def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None):
+        if conditions is None:
+            conditions = {}
+        return cls(endpoint=endpoint, conditions=conditions)
+
     def addEndpointSynonym(self, endpointSynonym: str):
         if self.endpointSynonyms is None:
             self.endpointSynonyms = []
@@ -71,6 +77,11 @@ class EffectRecord(BaseModel):
                 if isinstance(value, dict):
                     parameters[key] = Value(**value)
         return cls(**data)
+
+    class Config:
+        allow_population_by_field_name = True
+
+EffectRecord = create_model('EffectRecord', __base__=EffectRecord)
 
 class ProtocolEffectRecord(EffectRecord):
     protocol: Protocol
@@ -111,26 +122,42 @@ class Company(BaseModel):
     uuid: Optional[str] = None
     name: str
 
-class Substance(BaseModel):
+class Sample(BaseModel):
     uuid: str
 
-class Owner(BaseModel):
-    substance: Substance
-    company: Company
+class SampleLink(BaseModel):
+    substance: Sample
+    company: Company = Company(name="Default company")
+
+    class Config:
+        allow_population_by_field_name = True
+
 
 class ProtocolApplication(BaseModel):
-    uuid: str
+    uuid: Optional[str] = None
     #reliability: Optional[ReliabilityParams]
     interpretationResult: Optional[str] = None
     interpretationCriteria: Optional[str] = None
-    parameters: Dict[str, Union[str, Value, None]]
+    parameters: Optional[Dict[str, Union[str, Value, None]]] = None
     citation: Optional[Citation]
     effects: List[EffectRecord]
-    owner : Optional[Owner]
-    protocol: Protocol
+    owner : Optional[SampleLink]
+    protocol: Optional[Protocol] = None
     investigation_uuid: Optional[str] = None
     assay_uuid: Optional[str] = None
     updated: Optional[str]
+
+    class Config:
+        allow_population_by_field_name = True
+
+    @classmethod
+    def create(cls,  protocol: Protocol = None , effects: List[EffectRecord] = None,**kwargs):
+        if protocol is None:
+            protocol = Protocol()
+        if effects is None:
+            effects = []
+        return cls(protocol = protocol,effects=effects, **kwargs)
+
     @classmethod
     def from_dict(cls, data: dict):
         if 'parameters' in data:
@@ -148,6 +175,7 @@ class ProtocolApplication(BaseModel):
 
         return json.dumps(self.__dict__, default=protocol_application_encoder)
 
+ProtocolApplication = create_model('ProtocolApplication', __base__=ProtocolApplication)
 
 # parsed_json["substance"][0]
 # s = Study(**sjson)
@@ -173,13 +201,13 @@ class ReferenceSubstance(BaseModel):
 
 class SubstanceRecord(BaseModel):
     URI : Optional[str] = None
-    ownerUUID : str
-    ownerName : str
-    i5uuid  : str
+    ownerUUID : Optional[str] = None
+    ownerName : Optional[str] = None
+    i5uuid  : Optional[str] = None
     name : str
     publicname : Optional[str] = None
     format: Optional[str] = None
-    substanceType: str
+    substanceType: Optional[str] = None
     referenceSubstance: Optional[ReferenceSubstance] = None
     # composition : List[]
     # externalIdentifiers : List[]
