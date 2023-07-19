@@ -55,4 +55,16 @@ def papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True):
     df_controls = papp_mash(df_controls.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
     return df_samples,df_controls
 
+#
+# def cb(selected_columns,group,group_df):
+#    display(group_df)
+# grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
+def group_samplesdf(df_samples, cols_unique=["endpoint","endpointtype","unit"],callback=None):
+    selected_columns = [col for col in cols_unique if col in df_samples.columns]
+    grouped_dataframes = df_samples.groupby(selected_columns)
+    if callback != None:
+        for group, group_df in grouped_dataframes:
+            callback(selected_columns,group,group_df)
+    return grouped_dataframes
+
 
