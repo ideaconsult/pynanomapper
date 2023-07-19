@@ -33,7 +33,8 @@ def papp_mash(df, dfcols, condcols, drop_parsed_cols=True):
         #print(_col,df.shape,df_normalized.shape)
         for col in df_normalized.columns:
             df.loc[:, col] = df_normalized[col]
-        if drop_parsed_cols:
+        #if there are non dict values, leave the column, otherwise drop it, we have the values parsed
+        if drop_parsed_cols and df[_col].apply(lambda x: isinstance(x, dict)).all():
             df.drop(columns=[_col], inplace=True)
         #print(_col,df.shape,df_normalized.shape,df_c.shape)
         #break
@@ -46,7 +47,7 @@ def papp_mash(df, dfcols, condcols, drop_parsed_cols=True):
 # from pynanomapper.datamodel import measurements2nexus as m2n
 # df_samples, df_controls = m2n.papp2df(pa, _col="CONCENTRATION")
 def papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True):
-    df, dfcols,resultcols, condcols = effects2df(pa.effects)
+    df, dfcols,resultcols, condcols = effects2df(pa.effects,drop_parsed_cols)
     df_samples = df.loc[df[_col].apply(lambda x: isinstance(x, dict))]
     df_controls = df.loc[df[_col].apply(lambda x: isinstance(x, str))]
     #df_string.dropna(axis=1,how="all",inplace=True)
@@ -55,12 +56,17 @@ def papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True):
     df_controls = papp_mash(df_controls.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
     return df_samples,df_controls
 
+import re
 #
 # def cb(selected_columns,group,group_df):
 #    display(group_df)
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
-def group_samplesdf(df_samples, cols_unique=["endpoint","endpointtype","unit"],callback=None):
-    selected_columns = [col for col in cols_unique if col in df_samples.columns]
+def group_samplesdf(df_samples, cols_unique=None,callback=None):
+    if cols_unique is None:
+        _pattern = r'CONCENTRATION_.*loValue$'
+        selected_columns = [col for col in df_samples.columns if col not in ["loValue","errQualifier"] and not bool(re.match(_pattern, col))]
+    else:
+        selected_columns = [col for col in cols_unique if col in df_samples.columns]
     grouped_dataframes = df_samples.groupby(selected_columns)
     if callback != None:
         for group, group_df in grouped_dataframes:
