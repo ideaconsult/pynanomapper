@@ -8,7 +8,7 @@ import json
 
  #The Optional type is used to indicate that a field can have a value of either the specified type or None.
 class Value(BaseModel):
-    units: Optional[str] = None
+    unit: Optional[str] = None
     loValue: Optional[float] = None
     upValue: Optional[float] = None
     loQualifier: Optional[str] = None
@@ -28,18 +28,22 @@ class Protocol(BaseModel):
     endpoint: Optional[str] = None
     guideline: List[str] = None
 
-class EffectRecord(BaseModel):
-    endpoint: str
-    unit: Optional[str] = None
+class EffectResults(BaseModel):
     loQualifier: Optional[str] = None
     loValue: Optional[float] = None
     upQualifier: Optional[str] = None
     upValue: Optional[float] = None
-    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
     textValue: Optional[str] = None
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
-    idresult: Optional[int] = -1
+
+class EffectRecord(BaseModel):
+    endpoint: str
+    endpointtype: Optional[str] = None
+    unit: Optional[str] = None
+    result: EffectResults = None
+    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
+    idresult: Optional[int] = None
     endpointGroup: Optional[int] = None
     endpointSynonyms: List[str] = None
     sampleID: Optional[str] = None
