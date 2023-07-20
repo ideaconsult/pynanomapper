@@ -5,6 +5,8 @@ import numpy as np
 
 #https://github.com/nexusformat/definitions/issues/807
 #
+# https://github.com/nexusformat/definitions/blob/main/base_classes/NXroot.nxdl.xml
+# https://github.com/nexusformat/python-nxs/blob/master/nxs/tree.py
 
 import pandas as pd
 import nexusformat.nexus.tree as nx
@@ -185,8 +187,8 @@ class Study2Nexus:
         self._root['entry/sample'] = nx.tree.NXsample()
         self._root['entry/sample/temperature'] = nx.tree.NXfield(40.0, units='K')
         self._root['entry/sample/mass'] = nx.tree.NXfield(10.0, units='g')
-        self._root['instrument'] = nx.tree.NXinstrument()
-        self._root['instrument/energy'] = nx.tree.NXfield(87.1, units='keV')
+        self._root['entry/instrument'] = nx.tree.NXinstrument()
+        self._root['entry/instrument/energy'] = nx.tree.NXfield(87.1, units='keV')
 
 
 #s2n = Study2Nexus()

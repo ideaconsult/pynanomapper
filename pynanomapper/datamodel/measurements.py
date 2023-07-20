@@ -1,13 +1,19 @@
 from typing import List, TypeVar, Generic
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, validator
 from enum import Enum
 
 import typing
 from typing import Dict, Optional, Union
 import json
+import numpy as np
+from numpy.typing import NDArray
+from .ambit_deco import (add_ambitmodel_method)
 
  #The Optional type is used to indicate that a field can have a value of either the specified type or None.
-class Value(BaseModel):
+class AmbitModel(BaseModel):
+    pass
+
+class Value(AmbitModel):
     unit: Optional[str] = None
     loValue: Optional[float] = None
     upValue: Optional[float] = None
@@ -17,18 +23,18 @@ class Value(BaseModel):
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
 
-class EndpointCategory(BaseModel):
+class EndpointCategory(AmbitModel):
     code: str
     term: Optional[str]
     title: Optional[str]
 
-class Protocol(BaseModel):
+class Protocol(AmbitModel):
     topcategory: Optional[str] = None
     category: Optional[EndpointCategory] = None
     endpoint: Optional[str] = None
     guideline: List[str] = None
 
-class EffectResults(BaseModel):
+class EffectResults(AmbitModel):
     loQualifier: Optional[str] = None
     loValue: Optional[float] = None
     upQualifier: Optional[str] = None
@@ -37,11 +43,22 @@ class EffectResults(BaseModel):
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
 
-class EffectRecord(BaseModel):
+
+class EffectsResultsArray(AmbitModel):
+    axes: List[NDArray] = None
+    signal: Union[NDArray, None] = None
+    errors_low: Union[NDArray, None] = None
+    errors_high: Union[NDArray, None] = None
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class EffectRecord(AmbitModel):
     endpoint: str
     endpointtype: Optional[str] = None
     unit: Optional[str] = None
     result: EffectResults = None
+    result_array: Optional[EffectsResultsArray] = None
     conditions: Optional[Dict[str, Union[str, Value, None]]] = None
     idresult: Optional[int] = None
     endpointGroup: Optional[int] = None
@@ -109,7 +126,7 @@ class STRUC_TYPE(str, Enum):
 
 
 
-class ReliabilityParams(BaseModel):
+class ReliabilityParams(AmbitModel):
     r_isRobustStudy: Optional[str] = None
     r_isUsedforClassification: Optional[str] = None
     r_isUsedforMSDS: Optional[str] = None
@@ -117,19 +134,19 @@ class ReliabilityParams(BaseModel):
     r_studyResultType: Optional[str] = None
     r_value: Optional[str] = None
 
-class Citation(BaseModel):
+class Citation(AmbitModel):
     year: Optional[str] = None
     title: str
     owner: str
 
-class Company(BaseModel):
+class Company(AmbitModel):
     uuid: Optional[str] = None
     name: str
 
-class Sample(BaseModel):
+class Sample(AmbitModel):
     uuid: str
 
-class SampleLink(BaseModel):
+class SampleLink(AmbitModel):
     substance: Sample
     company: Company = Company(name="Default company")
 
@@ -137,7 +154,7 @@ class SampleLink(BaseModel):
         allow_population_by_field_name = True
 
 
-class ProtocolApplication(BaseModel):
+class ProtocolApplication(AmbitModel):
     uuid: Optional[str] = None
     #reliability: Optional[ReliabilityParams]
     interpretationResult: Optional[str] = None
@@ -183,7 +200,7 @@ ProtocolApplication = create_model('ProtocolApplication', __base__=ProtocolAppli
 
 # parsed_json["substance"][0]
 # s = Study(**sjson)
-class Study(BaseModel):
+class Study(AmbitModel):
     """
     Example:
         # Creating an instance of Substances, with studies
@@ -199,11 +216,11 @@ class Study(BaseModel):
     """
     study: List[ProtocolApplication]
 
-class ReferenceSubstance(BaseModel):
+class ReferenceSubstance(AmbitModel):
     i5uuid : Optional[str] = None
     uri: Optional[str] = None
 
-class SubstanceRecord(BaseModel):
+class SubstanceRecord(AmbitModel):
     URI : Optional[str] = None
     ownerUUID : Optional[str] = None
     ownerName : Optional[str] = None
@@ -227,7 +244,7 @@ class SubstanceRecord(BaseModel):
 
 # s = Substances(**parsed_json)
 
-class Substances(BaseModel):
+class Substances(AmbitModel):
     """
     Example:
         # Creating an instance of Substances, with studies
