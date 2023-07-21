@@ -42,7 +42,7 @@ class EffectResults(AmbitModel):
     textValue: Optional[str] = None
     errQualifier: Optional[str] = None
     errValue: Optional[float] = None
-
+    unit: Optional[str] = None
 
 class EffectsResultsArray(AmbitModel):
     axes: List[NDArray] = None
@@ -56,7 +56,6 @@ class EffectsResultsArray(AmbitModel):
 class EffectRecord(AmbitModel):
     endpoint: str
     endpointtype: Optional[str] = None
-    unit: Optional[str] = None
     result: EffectResults = None
     result_array: Optional[EffectsResultsArray] = None
     conditions: Optional[Dict[str, Union[str, Value, None]]] = None
