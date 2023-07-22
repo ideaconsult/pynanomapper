@@ -102,6 +102,17 @@ class EffectRecord(AmbitModel):
 
         return json.dumps(self.__dict__, default=effect_record_encoder)
 
+    @validator('conditions', pre=True)
+    def clean_parameters(cls, v):
+        if v is None:
+            return {}
+        for key, value in v.items():
+            if key=="REPLICATE" and isinstance(value, dict):
+                try:
+                    v[key] = str(value["loValue"])
+                except Exception as err:
+                    v[key] = err
+        return v
 
     @classmethod
     def from_dict(cls, data: dict):
