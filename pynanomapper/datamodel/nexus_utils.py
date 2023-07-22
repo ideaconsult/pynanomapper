@@ -181,16 +181,18 @@ def format_name(meta_dict,key, default = ""):
     name = meta_dict[key] if key in meta_dict else default
     return name if isinstance(name,str) else default if math.isnan(name) else name
 
-def nexus_data(selected_columns,group,group_df):
+def nexus_data(selected_columns,group,group_df,debug=True):
         meta_dict = dict(zip(selected_columns, group))
         #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
-        display(tmp)
+        if debug:
+            display(tmp)
 
         ds_conc = []
         ds_response = None
         ds_time = None
-        ds_aux = None
+        ds_aux = []
+        ds_aux_tags = []
         ds_errors = None
         for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
             if c in tmp.columns:
@@ -206,24 +208,35 @@ def nexus_data(selected_columns,group,group_df):
 
         if "upValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
-            ds_aux = nx.tree.NXfield(tmp["upValue"].values, name="{}_upValue".format(meta_dict["endpoint"]), units=unit)
+            tag = "{}_upValue".format(meta_dict["endpoint"])
+            ds_aux.append(nx.tree.NXfield(tmp["upValue"].values, name= tag, units=unit))
+            ds_aux_tags.append(tag)
 
         if "errorValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_errors = nx.tree.NXfield(tmp["errorValue"].values, name="{}_errors".format(meta_dict["endpoint"]), units=unit)
+
+        #this can't be written ...
+        #if "textValue" in tmp:
+        #    tag="{}_text".format(meta_dict["endpoint"])
+        #    ds_aux_tags.append(tag)
+        #    ds_aux.append(nx.tree.NXfield(tmp["textValue"].astype(str).values, name=tag))
 
         for t in ["E.EXPOSURE_TIME"]:
             tag_value = "{}_loValue".format(t)
             tag_unit = "{}_unit".format(t)
             if tag_value in tmp.columns:
                 unit = meta_dict[tag_unit] if tag_unit in meta_dict else ""
-                ds_time = nx.tree.NXfield(tmp[tag_value].values, name=meta_dict[tag_value], units=unit)
+                ds_time = nx.tree.NXfield(tmp[tag_value].values, name=t, units=unit)
                 ds_conc.append(ds_time)
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
-        if ds_aux != None:
-            tag = "{}_upValue".format(meta_dict["endpoint"])
-            nxdata[tag] = ds_aux
-            nxdata.attrs["auxiliary_signals"] = tag
+        print(ds_aux)
+        if len(ds_aux) > 0:
+            for index, a in enumerate(ds_aux_tags):
+                nxdata[a] = ds_aux[index]
+            nxdata.attrs["auxiliary_signals"] = ds_aux_tags
+        if debug:
+            print(nxdata.tree)
         return nxdata,meta_dict
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
@@ -261,6 +274,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
             index = index + 1
     except Exception as err:
         raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
+
     return entry
 
 
