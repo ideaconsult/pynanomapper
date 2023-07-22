@@ -183,12 +183,12 @@ def format_name(meta_dict,key, default = ""):
 
 def nexus_data(selected_columns,group,group_df):
         meta_dict = dict(zip(selected_columns, group))
-        #print(group)
+        #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
         ds_conc = []
         ds_response = None
         ds_time = None
-        for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue"]:
+        for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
             if c in tmp.columns:
                 tmp = tmp.sort_values(by=[c])
                 c_tag = c
@@ -200,13 +200,18 @@ def nexus_data(selected_columns,group,group_df):
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
+        if "errorValue" in tmp:
+            unit = meta_dict["unit"] if "unit" in meta_dict else ""
+            ds_errors = nx.tree.NXfield(tmp["errorValue"].values, name="{}_errors".format(meta_dict["endpoint"]), units=unit)
+        else:
+            ds_errors = None
         for t in ["E.EXPOSURE_TIME"]:
             tag_value = "{}_loValue".format(t)
             tag_unit = "{}_unit".format(t)
             if tag_value in tmp.columns:
                 unit = meta_dict[tag_unit] if tag_unit in meta_dict else ""
                 ds_time = nx.tree.NXfield(tmp[tag_value].values, name=meta_dict[tag_value], units=unit)
-        return nx.tree.NXdata(ds_response, ds_conc ),meta_dict
+        return nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors ),meta_dict
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     df_samples, df_controls = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
@@ -306,7 +311,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
 def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONCENTRATION_.*loValue$'):
     if cols_unique is None:
-        selected_columns = [col for col in df_samples.columns if col not in ["loValue","errQualifier"] and not bool(re.match(_pattern, col))]
+        selected_columns = [col for col in df_samples.columns if col not in ["loValue","errQualifier","errorValue"] and not bool(re.match(_pattern, col))]
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values

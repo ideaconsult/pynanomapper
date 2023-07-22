@@ -21,7 +21,7 @@ class Value(AmbitModel):
     upQualifier: Optional[str] = None
     annotation: Optional[str] = None
     errQualifier: Optional[str] = None
-    errValue: Optional[float] = None
+    errorValue: Optional[float] = None
 
 class EndpointCategory(AmbitModel):
     code: str
@@ -41,7 +41,7 @@ class EffectResults(AmbitModel):
     upValue: Optional[float] = None
     textValue: Optional[str] = None
     errQualifier: Optional[str] = None
-    errValue: Optional[float] = None
+    errorValue: Optional[float] = None
     unit: Optional[str] = None
 
 class EffectsResultsArray(AmbitModel):
