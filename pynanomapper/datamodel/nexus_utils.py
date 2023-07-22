@@ -185,9 +185,13 @@ def nexus_data(selected_columns,group,group_df):
         meta_dict = dict(zip(selected_columns, group))
         #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
+        display(tmp)
+
         ds_conc = []
         ds_response = None
         ds_time = None
+        ds_aux = None
+        ds_errors = None
         for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
             if c in tmp.columns:
                 tmp = tmp.sort_values(by=[c])
@@ -200,18 +204,27 @@ def nexus_data(selected_columns,group,group_df):
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
+        if "upValue" in tmp:
+            unit = meta_dict["unit"] if "unit" in meta_dict else ""
+            ds_aux = nx.tree.NXfield(tmp["upValue"].values, name="{}_upValue".format(meta_dict["endpoint"]), units=unit)
+
         if "errorValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_errors = nx.tree.NXfield(tmp["errorValue"].values, name="{}_errors".format(meta_dict["endpoint"]), units=unit)
-        else:
-            ds_errors = None
+
         for t in ["E.EXPOSURE_TIME"]:
             tag_value = "{}_loValue".format(t)
             tag_unit = "{}_unit".format(t)
             if tag_value in tmp.columns:
                 unit = meta_dict[tag_unit] if tag_unit in meta_dict else ""
                 ds_time = nx.tree.NXfield(tmp[tag_value].values, name=meta_dict[tag_value], units=unit)
-        return nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors ),meta_dict
+                ds_conc.append(ds_time)
+        nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        if ds_aux != None:
+            tag = "{}_upValue".format(meta_dict["endpoint"])
+            nxdata[tag] = ds_aux
+            nxdata.attrs["auxiliary_signals"] = tag
+        return nxdata,meta_dict
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     df_samples, df_controls = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
@@ -311,7 +324,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
 def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONCENTRATION_.*loValue$'):
     if cols_unique is None:
-        selected_columns = [col for col in df_samples.columns if col not in ["loValue","errQualifier","errorValue"] and not bool(re.match(_pattern, col))]
+        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue"] and not bool(re.match(_pattern, col))]
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values
