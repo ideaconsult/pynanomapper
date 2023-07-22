@@ -64,6 +64,20 @@ class EffectRecord(AmbitModel):
     endpointSynonyms: List[str] = None
     sampleID: Optional[str] = None
 
+    @validator('endpoint', pre=True)
+    def clean_endpoint(cls, v):
+        if v is None:
+            return None
+        else:
+            return v.replace("/","_")
+
+    @validator('endpointtype', pre=True)
+    def clean_endpointtype(cls, v):
+        if v is None:
+            return None
+        else:
+            return v.replace("/","_")
+
     @classmethod
     def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None):
         if conditions is None:
@@ -178,14 +192,20 @@ class ProtocolApplication(AmbitModel):
             effects = []
         return cls(protocol = protocol,effects=effects, **kwargs)
 
-    @classmethod
-    def from_dict(cls, data: dict):
-        if 'parameters' in data:
-            parameters = data['parameters']
-            for key, value in parameters.items():
-                if isinstance(value, dict):
-                    parameters[key] = Value(**value)
-        return cls(**data)
+    @validator('parameters', pre=True)
+    def clean_parameters(cls, v):
+        if v is None:
+            return {}
+
+        cleaned_params = {}
+        for key, value in v.items():
+            new_key = key.replace("/", "_") if "/" in key else key
+            if isinstance(value, dict):
+                cleaned_params[new_key] = Value(**value)
+            else:
+                cleaned_params[new_key] = value
+
+        return cleaned_params
 
     def to_json(self):
         def protocol_application_encoder(obj):

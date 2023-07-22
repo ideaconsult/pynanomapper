@@ -6,6 +6,7 @@ from . ambit_deco import add_ambitmodel_method
 import nexusformat.nexus as nx
 import pandas as pd
 import re
+import traceback
 
 # Usage
 # from  pynanomapper.datamodel.nexus_utils import to_nexus
@@ -132,7 +133,7 @@ def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
     if nx_root == None:
         nx_root = nx.NXroot()
     for papp in study.study:
-        print(papp.uuid)
+        #print(papp.uuid)
         papp.to_nexus(nx_root);
     return nx_root
 
@@ -155,8 +156,9 @@ def to_nexus(substances : mx.Substances, nx_root: nx.NXroot() = None ):
 
 import math
 
-def format_name(name):
-    return name if isinstance(name,str) else "" if math.isnan(name) else name
+def format_name(meta_dict,key, default = ""):
+    name = meta_dict[key] if key in meta_dict else default
+    return name if isinstance(name,str) else default if math.isnan(name) else name
 
 def nexus_data(selected_columns,group,group_df):
         meta_dict = dict(zip(selected_columns, group))
@@ -191,27 +193,33 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
 
     index = 1
     for group, group_df in grouped_dataframes:
-        nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
-        print(meta_dict)
-        endpointtype = meta_dict["endpointtype"] if "endpointtype" in meta_dict else "DEFAULT"
-        replicates = "{} {}".format(
-                    format_name(meta_dict["EXPERIMENT"] if "EXPERIMENT" in meta_dict else "DEFAULT"),
-                    format_name(meta_dict["REPLICATE"] if "REPLICATE" in meta_dict else "DEFAULT"))
-        if replicates.strip() == "":
-            replicates="DEFAULT"
-        endpointtype_group = getattr(entry, endpointtype, None)
-        if endpointtype_group is None:
-            endpointtype_group = nx.tree.NXgroup()
-            entry[endpointtype] = endpointtype_group
-        replicates_group = getattr(endpointtype_group, replicates, None)
-        if replicates_group is None:
-            replicates_group = nx.tree.NXsubentry()
-            endpointtype_group[replicates] = replicates_group
-        nxdata.name = ""
-        entryid = "data_{}".format(index)
-        replicates_group[entryid] = nxdata
+        try:
+            nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
+            #print(meta_dict)
+            endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
+            replicates = "{} {}".format(
+                        format_name(meta_dict,"EXPERIMENT","DEFAULT"),
+                        format_name(meta_dict,"REPLICATE","DEFAULT"))
+            if replicates.strip() == "":
+                replicates="DEFAULT"
 
-        index = index + 1
+            endpointtype_group = getattr(entry, endpointtype, None)
+            if endpointtype_group is None:
+                endpointtype_group = nx.tree.NXgroup()
+                entry[endpointtype] = endpointtype_group
+            replicates_group = getattr(endpointtype_group, replicates, None)
+            if replicates_group is None:
+                replicates_group = nx.tree.NXsubentry()
+                endpointtype_group[replicates] = replicates_group
+            nxdata.name = ""
+            entryid = "data_{}".format(index)
+
+            replicates_group[entryid] = nxdata
+
+            index = index + 1
+        except Exception as err:
+            print(group,err)
+            print(traceback.format_exc())
     return entry
 
 
