@@ -10,7 +10,7 @@ import traceback
 
 
 """
-    data model to nexus
+    ProtocolApplication to nexus entry (NXentry)
 
     Args:
         papp (ProtocolApplication): The numerator.
@@ -81,7 +81,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                 experiment_documentation["guideline"] = papp.protocol.guideline
                 break
     except Exception as err:
-        raise Exception("protocol parsing error " + str(err)) from err
+        raise Exception("ProtocolApplication: protocol parsing error " + str(err)) from err
 
     try:
         citation_id = '{}/reference'.format(entry_id)
@@ -92,7 +92,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             nx_root[citation_id]["owner"] = papp.citation.owner
         #url, doi, description
     except Exception as err:
-        raise Exception("citation data parsing error " + str(err)) from err
+        raise Exception("ProtocolApplication: citation data parsing error " + str(err)) from err
 
     instrument = nx.NXinstrument()
     parameters = nx.NXcollection()
@@ -132,19 +132,19 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                     #tbd ranges?
                     target[prm] = nx.NXfield(value.loValue,unit=value.unit)
             except Exception as err:
-                raise Exception("papp parameters parsing error " + str(err)) from err
+                raise Exception("ProtocolApplication: parameters parsing error " + str(err)) from err
 
     if not (papp.owner is None):
         try:
             sample["uuid"] = papp.owner.substance.uuid
             sample["provider"] = papp.owner.company.name
         except Exception as err:
-            raise Exception("papp.owner parsing error " + str(err)) from err
+            raise Exception("ProtocolApplication owner (sample) parsing error " + str(err)) from err
 
     try:
         process_pa(papp,nx_root[entry_id])
     except Exception as err:
-        raise Exception("papp data parsing error " + str(err)) from err
+        raise Exception("ProtocolApplication: effectrecords parsing error " + str(err)) from err
 
     return nx_root
 
@@ -213,8 +213,8 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     grouped_dataframes, selected_columns = group_samplesdf(df_samples, cols_unique = None)
 
     index = 1
-    for group, group_df in grouped_dataframes:
-        try:
+    try:
+        for group, group_df in grouped_dataframes:
             nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
             #print(meta_dict)
             endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
@@ -227,20 +227,22 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
             endpointtype_group = getattr(entry, endpointtype, None)
             if endpointtype_group is None:
                 endpointtype_group = nx.tree.NXgroup()
+                endpointtype_group.name = "endpointtype"
+                endpointtype_group.attrs["endpointtype"] = endpointtype
                 entry[endpointtype] = endpointtype_group
             replicates_group = getattr(endpointtype_group, replicates, None)
             if replicates_group is None:
                 replicates_group = nx.tree.NXsubentry()
+                replicates_group.name = "EXPERIMENT and REPLICATE"
+                replicates_group.attrs["EXPERIMENT"] = format_name(meta_dict,"EXPERIMENT","")
+                replicates_group.attrs["REPLICATE"] = format_name(meta_dict,"REPLICATE","")
                 endpointtype_group[replicates] = replicates_group
             nxdata.name = ""
             entryid = "data_{}".format(index)
-
             replicates_group[entryid] = nxdata
-
             index = index + 1
-        except Exception as err:
-            print(group,err)
-            print(traceback.format_exc())
+    except Exception as err:
+        raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
     return entry
 
 
@@ -297,7 +299,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
         df_controls = papp_mash(df_controls.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
     return df_samples,df_controls
 
-import re
+
 #
 # def cb(selected_columns,group,group_df):
 #    display(group_df)
@@ -308,7 +310,10 @@ def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONC
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values
-    grouped_dataframes = df_samples.groupby(selected_columns,dropna=False)
+    try:
+        grouped_dataframes = df_samples.groupby(selected_columns,dropna=False)
+    except Exception as err:
+        raise Exception("group_samplesdf: {} {}".format(selected_columns,err)) from err
     if callback != None:
         for group, group_df in grouped_dataframes:
             callback(selected_columns,group,group_df)
