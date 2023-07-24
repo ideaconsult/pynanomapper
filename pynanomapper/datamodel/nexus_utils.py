@@ -202,15 +202,20 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                 c_unit = meta_dict[c_unittag] if c_unittag in tmp.columns else ""
                 ds_conc.append(nx.tree.NXfield(tmp[c].values, name=c_tag, units=c_unit))
 
+
         if "loValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
-        if "upValue" in tmp:
-            unit = meta_dict["unit"] if "unit" in meta_dict else ""
-            tag = "{}_upValue".format(meta_dict["endpoint"])
-            ds_aux.append(nx.tree.NXfield(tmp["upValue"].values, name= tag, units=unit))
-            ds_aux_tags.append(tag)
+        for tag in ["REPLICATE","EXPERIMENT"]:
+            if tag in tmp:
+                unit = None
+                if tag == "upValue":
+                    tag = "{}_upValue".format(meta_dict["endpoint"])
+                    unit = meta_dict["unit"] if "unit" in meta_dict else ""
+                int_array = np.array([int(x) if x is not None and x.isdigit() else np.nan for x in tmp[tag].values])
+                ds_aux.append(nx.tree.NXfield(int_array, name= tag, units= unit))
+                ds_aux_tags.append(tag)
 
         if "errorValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
@@ -246,32 +251,24 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     index = 1
     try:
         for group, group_df in grouped_dataframes:
-            nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
-            #print(meta_dict)
-            endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
-            replicates = "{} {}".format(
-                        format_name(meta_dict,"EXPERIMENT","DEFAULT"),
-                        format_name(meta_dict,"REPLICATE","DEFAULT"))
-            if replicates.strip() == "":
-                replicates="DEFAULT"
+            try:
+                #print(group_df.info())
+                nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
+                #print(meta_dict)
+                endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
 
-            endpointtype_group = getattr(entry, endpointtype, None)
-            if endpointtype_group is None:
-                endpointtype_group = nx.tree.NXgroup()
-                endpointtype_group.name = "endpointtype"
-                endpointtype_group.attrs["endpointtype"] = endpointtype
-                entry[endpointtype] = endpointtype_group
-            replicates_group = getattr(endpointtype_group, replicates, None)
-            if replicates_group is None:
-                replicates_group = nx.tree.NXsubentry()
-                replicates_group.name = "EXPERIMENT and REPLICATE"
-                replicates_group.attrs["EXPERIMENT"] = format_name(meta_dict,"EXPERIMENT","")
-                replicates_group.attrs["REPLICATE"] = format_name(meta_dict,"REPLICATE","")
-                endpointtype_group[replicates] = replicates_group
-            nxdata.name = ""
-            entryid = "data_{}".format(index)
-            replicates_group[entryid] = nxdata
-            index = index + 1
+                endpointtype_group = getattr(entry, endpointtype, None)
+                if endpointtype_group is None:
+                    endpointtype_group = nx.tree.NXgroup()
+                    endpointtype_group.name = "endpointtype"
+                    endpointtype_group.attrs["endpointtype"] = endpointtype
+                    entry[endpointtype] = endpointtype_group
+                nxdata.name = ""
+                entryid = "data_{}".format(index)
+                endpointtype_group[entryid] = nxdata
+                index = index + 1
+            except Exception as xx:
+                print(xx)
     except Exception as err:
         raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
 
@@ -338,7 +335,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
 def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONCENTRATION_.*loValue$'):
     if cols_unique is None:
-        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue"] and not bool(re.match(_pattern, col))]
+        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values
