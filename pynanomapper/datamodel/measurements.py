@@ -8,7 +8,8 @@ import json
 import numpy as np
 from numpy.typing import NDArray
 from .ambit_deco import (add_ambitmodel_method)
-
+import re
+import math
  #The Optional type is used to indicate that a field can have a value of either the specified type or None.
 class AmbitModel(BaseModel):
     pass
@@ -106,13 +107,23 @@ class EffectRecord(AmbitModel):
     def clean_parameters(cls, v):
         if v is None:
             return {}
+        conditions = {}
         for key, value in v.items():
-            if key=="REPLICATE" and isinstance(value, dict):
-                try:
-                    v[key] = str(value["loValue"])
-                except Exception as err:
-                    v[key] = err
-        return v
+            if value is None:
+                continue
+
+            if key in ["REPLICATE","EXPERIMENT"]:
+                if isinstance(value, dict):
+                    conditions[key] = value["loValue"]
+                else:
+                    #if math.isnan(value):
+                        #continue
+                    match = re.search(r'[+-]?\d+(?:\.\d+)?', value)
+                    if match:
+                        conditions[key] = match.group()
+            else:
+                conditions[key] = value
+        return conditions
 
     @classmethod
     def from_dict(cls, data: dict):
