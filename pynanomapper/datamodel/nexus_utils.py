@@ -198,10 +198,11 @@ def format_name(meta_dict,key, default = ""):
     name = meta_dict[key] if key in meta_dict else default
     return name if isinstance(name,str) else default if math.isnan(name) else name
 
-def nexus_data(selected_columns,group,group_df,debug=True):
+def nexus_data(selected_columns,group,group_df,condcols,debug=False):
     try:
         meta_dict = dict(zip(selected_columns, group))
         print(meta_dict)
+        print(condcols)
         #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
         if debug:
@@ -226,44 +227,16 @@ def nexus_data(selected_columns,group,group_df,debug=True):
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
-      #  for tag in ["REPLICATE","EXPERIMENT","upValue"]:
-        for tag in ["REPLICATE","EXPERIMENT","upValue"]:
-            if tag in tmp:
-                unit = None
-                if tag == "upValue":
-                    unit = meta_dict["unit"] if "unit" in meta_dict else ""
-                    name = "{}_upValue".format(meta_dict["endpoint"])
-                    ds_aux.append(nx.tree.NXfield(tmp[tag].values, name= name, units= unit))
-                    ds_aux_tags.append(name)
-                else:
-                    int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
-                    #print(int_array,)
-                    ds_aux.append(nx.tree.NXfield(int_array, name= tag))
-                    ds_aux_tags.append(tag)
+        if "upValue" in tmp:
+            unit = meta_dict["unit"] if "unit" in meta_dict else ""
+            name = "{}_upValue".format(meta_dict["endpoint"])
+            ds_aux.append(nx.tree.NXfield(tmp["upValue"].values, name= name, units= unit))
+            ds_aux_tags.append(name)
 
         if "errorValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_errors = nx.tree.NXfield(tmp["errorValue"].values, name="{}_errors".format(meta_dict["endpoint"]), units=unit)
 
-        #this can't be written ...
-        #if "textValue" in tmp:
-        #    tag="{}_text".format(meta_dict["endpoint"])
-        #    ds_aux_tags.append(tag)
-        #    ds_aux.append(nx.tree.NXfield(tmp["textValue"].astype(str).values, name=tag))
-
-        for t in ["E.EXPOSURE_TIME"]:
-            tag_value = "{}_loValue".format(t)
-            tag_unit = "{}_unit".format(t)
-            if tag_value in tmp.columns:
-                unit = meta_dict[tag_unit] if tag_unit in meta_dict else ""
-                ds_time = nx.tree.NXfield(tmp[tag_value].values, name=t, units=unit)
-                ds_conc.append(ds_time)
-        nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
-        nxdata.attrs["endpoint"] = meta_dict["endpoint"]
-        if "endpointtype" in meta_dict:
-            nxdata.attrs["endpointtype"] = meta_dict["endpointtype"]
-        if "unit" in meta_dict:
-            nxdata.attrs["unit"] = meta_dict["unit"]
         for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
             if tag in tmp:
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
@@ -271,6 +244,33 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                 #print(str_array.dtype,str_array)
                 ds_aux.append(nx.tree.NXfield(str_array, name= tag))
                 ds_aux_tags.append(tag)
+
+        for tag in condcols:
+            if tag in tmp.columns:
+                if tag in ["REPLICATE","EXPERIMENT"]:
+                    unit = None
+                    int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
+                    ds_aux.append(nx.tree.NXfield(int_array, name= tag))
+                    ds_aux_tags.append(tag)
+                else:
+                    str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
+                    ds_aux.append(nx.tree.NXfield(str_array, name= tag))
+                    ds_aux_tags.append(tag)
+            else:
+                tag_value = "{}_loValue".format(tag)
+                tag_unit = "{}_unit".format(tag)
+                if tag_value in tmp.columns:
+                    unit = tmp[tag_unit].unique()[0] if tag_unit in tmp.columns else None
+                    ds_time = nx.tree.NXfield(tmp[tag_value].values, name=tag, units=unit)
+                    ds_conc.append(ds_time)
+
+        nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        nxdata.attrs["endpoint"] = meta_dict["endpoint"]
+        if "endpointtype" in meta_dict:
+            nxdata.attrs["endpointtype"] = meta_dict["endpointtype"]
+        if "unit" in meta_dict:
+            nxdata.attrs["unit"] = meta_dict["unit"]
+
 
         if len(ds_aux) > 0:
             for index, a in enumerate(ds_aux_tags):
@@ -283,7 +283,7 @@ def nexus_data(selected_columns,group,group_df,debug=True):
         raise Exception("EffectRecords: grouping error {} {} {}".format(selected_columns,group,err)) from err
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
-    df_samples, df_controls = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
+    df_samples,df_controls,resultcols, condcols = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
     grouped_dataframes, selected_columns = group_samplesdf(df_samples, cols_unique = None)
 
     index = 1
@@ -291,7 +291,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
         for group, group_df in grouped_dataframes:
             try:
                 #print(group_df.info())
-                nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
+                nxdata,meta_dict = nexus_data(selected_columns,group,group_df,condcols)
                 #print(meta_dict)
 
                 endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
@@ -366,7 +366,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
     if not (df_controls is None):
         cols_to_process = [col for col in condcols if col !=_col]
         df_controls = papp_mash(df_controls.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
-    return df_samples,df_controls
+    return df_samples,df_controls,resultcols, condcols
 
 
 #
