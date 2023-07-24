@@ -267,8 +267,10 @@ def nexus_data(selected_columns,group,group_df,debug=True):
         for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
             if tag in tmp:
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
-                nxdata.attrs[tag] =str_array
+                #nxdata.attrs[tag] =str_array
                 #print(str_array.dtype,str_array)
+                ds_aux.append(nx.tree.NXfield(str_array, name= tag))
+                ds_aux_tags.append(tag)
 
         if len(ds_aux) > 0:
             for index, a in enumerate(ds_aux_tags):
@@ -291,6 +293,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                 #print(group_df.info())
                 nxdata,meta_dict = nexus_data(selected_columns,group,group_df)
                 #print(meta_dict)
+
                 endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
 
                 endpointtype_group = getattr(entry, endpointtype, None)
@@ -300,7 +303,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                     endpointtype_group.attrs["endpointtype"] = endpointtype
                     entry[endpointtype] = endpointtype_group
                 nxdata.name = ""
-                entryid = "data_{}".format(index)
+                entryid = "data_{}_{}".format(index,meta_dict["endpoint"])
                 endpointtype_group[entryid] = nxdata
                 index = index + 1
 
