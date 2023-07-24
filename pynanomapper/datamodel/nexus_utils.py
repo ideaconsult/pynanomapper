@@ -260,6 +260,10 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                 ds_conc.append(ds_time)
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
         nxdata.attrs["endpoint"] = meta_dict["endpoint"]
+        if "endpointtype" in meta_dict:
+            nxdata.attrs["endpointtype"] = meta_dict["endpointtype"]
+        if "unit" in meta_dict:
+            nxdata.attrs["unit"] = meta_dict["unit"]
         for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
             if tag in tmp:
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
@@ -371,7 +375,7 @@ def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONC
         _pattern_c_unit = r'^CONCENTRATION.*_unit$'
         #selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","textValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
 
-        selected_columns = [col for col in df_samples.columns if col in ["endpoint","endpointtype"] or bool(re.match(_pattern_c_unit, col))]
+        selected_columns = [col for col in df_samples.columns if col in ["endpoint","endpointtype","unit"] or bool(re.match(_pattern_c_unit, col))]
 
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
