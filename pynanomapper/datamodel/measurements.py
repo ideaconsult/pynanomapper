@@ -112,7 +112,7 @@ class EffectRecord(AmbitModel):
             if value is None:
                 continue
             new_key = key.replace("/", "_") if "/" in key else key
-            if key in ["REPLICATE","EXPERIMENT"]:
+            if key in ["REPLICATE","EXPERIMENT","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE"]:
                 if isinstance(value, dict):
                     conditions[new_key] = str(value["loValue"])
                 else:
