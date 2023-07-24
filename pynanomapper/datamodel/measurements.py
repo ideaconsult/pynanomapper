@@ -111,18 +111,18 @@ class EffectRecord(AmbitModel):
         for key, value in v.items():
             if value is None:
                 continue
-
+            new_key = key.replace("/", "_") if "/" in key else key
             if key in ["REPLICATE","EXPERIMENT"]:
                 if isinstance(value, dict):
-                    conditions[key] = str(value["loValue"])
+                    conditions[new_key] = str(value["loValue"])
                 else:
                     #if math.isnan(value):
                         #continue
                     match = re.search(r'[+-]?\d+(?:\.\d+)?', value)
                     if match:
-                        conditions[key] = match.group()
+                        conditions[new_key] = match.group()
             else:
-                conditions[key] = value
+                conditions[new_key] = value
         return conditions
 
     @classmethod
