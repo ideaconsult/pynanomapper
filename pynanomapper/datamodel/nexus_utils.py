@@ -7,7 +7,7 @@ import nexusformat.nexus as nx
 import pandas as pd
 import re
 import traceback
-
+import numbers
 
 """
     ProtocolApplication to nexus entry (NXentry)
@@ -164,9 +164,15 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
 def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
     if nx_root == None:
         nx_root = nx.NXroot()
+    x = 1
     for papp in study.study:
-        #print(papp.uuid)
+
         papp.to_nexus(nx_root);
+        #x = x+1
+        #if x>22:
+        #    print(papp.uuid)
+        #    papp.to_nexus(nx_root)
+        #    break
     return nx_root
 
 @add_ambitmodel_method(mx.SubstanceRecord)
@@ -193,7 +199,9 @@ def format_name(meta_dict,key, default = ""):
     return name if isinstance(name,str) else default if math.isnan(name) else name
 
 def nexus_data(selected_columns,group,group_df,debug=True):
+    try:
         meta_dict = dict(zip(selected_columns, group))
+        print(meta_dict)
         #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
         if debug:
@@ -218,7 +226,7 @@ def nexus_data(selected_columns,group,group_df,debug=True):
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
-
+      #  for tag in ["REPLICATE","EXPERIMENT","upValue"]:
         for tag in ["REPLICATE","EXPERIMENT","upValue"]:
             if tag in tmp:
                 unit = None
@@ -228,7 +236,8 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                     ds_aux.append(nx.tree.NXfield(tmp[tag].values, name= name, units= unit))
                     ds_aux_tags.append(name)
                 else:
-                    int_array = np.array([int(x) if x is not None and x.isdigit() else np.nan for x in tmp[tag].values])
+                    int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
+                    #print(int_array,)
                     ds_aux.append(nx.tree.NXfield(int_array, name= tag))
                     ds_aux_tags.append(tag)
 
@@ -250,9 +259,12 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                 ds_time = nx.tree.NXfield(tmp[tag_value].values, name=t, units=unit)
                 ds_conc.append(ds_time)
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        nxdata.attrs["endpoint"] = meta_dict["endpoint"]
         for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
             if tag in tmp:
-                nxdata.attrs[tag] = tmp[tag].values
+                str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
+                nxdata.attrs[tag] =str_array
+                #print(str_array.dtype,str_array)
 
         if len(ds_aux) > 0:
             for index, a in enumerate(ds_aux_tags):
@@ -261,6 +273,8 @@ def nexus_data(selected_columns,group,group_df,debug=True):
         if debug:
             print(nxdata.tree)
         return nxdata,meta_dict
+    except Exception as err:
+        raise Exception("EffectRecords: grouping error {} {} {}".format(selected_columns,group,err)) from err
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     df_samples, df_controls = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
@@ -285,8 +299,9 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                 entryid = "data_{}".format(index)
                 endpointtype_group[entryid] = nxdata
                 index = index + 1
+
             except Exception as xx:
-                print(xx)
+                print(traceback.format_exc().print_exc())
     except Exception as err:
         raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
 
@@ -353,7 +368,11 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
 def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONCENTRATION_.*loValue$'):
     if cols_unique is None:
-        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","textValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
+        _pattern_c_unit = r'^CONCENTRATION.*_unit$'
+        #selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","textValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
+
+        selected_columns = [col for col in df_samples.columns if col in ["endpoint","endpointtype"] or bool(re.match(_pattern_c_unit, col))]
+
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values
