@@ -40,10 +40,21 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
     except:
         entry_id = "entry_{}".format(papp.uuid)
 
-    nx_root[entry_id] = nx.tree.NXentry()
+    nxentry = nx.tree.NXentry()
+    nx_root[entry_id] = nxentry
+
     nx_root['{}/entry_identifier_uuid'.format(entry_id)] = papp.uuid
 
     nx_root['{}/definition'.format(entry_id)] = papp.__class__.__name__
+    nxmap = nx_root['{}/definition'.format(entry_id)]
+    nxmap.attrs["PROTOCOL_APPLICATION_UUID"]="entry_identifier_uuid"
+    nxmap.attrs["INVESTIGATION_UUID"]="collection_identifier"
+    nxmap.attrs["ASSAY_UUID"]="experiment_identifier"
+    nxmap.attrs["Protocol"]= "experiment_documentation"
+    nxmap.attrs["Citation"]= "reference"
+    nxmap.attrs["Substance"]= "sample"
+    nxmap.attrs["Parameters"]= ["instrument","environment","parameters"]
+    nxmap.attrs["EffectRecords"] = "datasets"
     #experiment_identifier
     #experiment_description
     #collection_identifier collection of related measurements or experiments.
@@ -207,15 +218,19 @@ def nexus_data(selected_columns,group,group_df,debug=True):
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
             ds_response = nx.tree.NXfield(tmp["loValue"].values, name=meta_dict["endpoint"], units=unit)
 
-        for tag in ["REPLICATE","EXPERIMENT"]:
+
+        for tag in ["REPLICATE","EXPERIMENT","upValue"]:
             if tag in tmp:
                 unit = None
                 if tag == "upValue":
-                    tag = "{}_upValue".format(meta_dict["endpoint"])
                     unit = meta_dict["unit"] if "unit" in meta_dict else ""
-                int_array = np.array([int(x) if x is not None and x.isdigit() else np.nan for x in tmp[tag].values])
-                ds_aux.append(nx.tree.NXfield(int_array, name= tag, units= unit))
-                ds_aux_tags.append(tag)
+                    name = "{}_upValue".format(meta_dict["endpoint"])
+                    ds_aux.append(nx.tree.NXfield(tmp[tag].values, name= name, units= unit))
+                    ds_aux_tags.append(name)
+                else:
+                    int_array = np.array([int(x) if x is not None and x.isdigit() else np.nan for x in tmp[tag].values])
+                    ds_aux.append(nx.tree.NXfield(int_array, name= tag))
+                    ds_aux_tags.append(tag)
 
         if "errorValue" in tmp:
             unit = meta_dict["unit"] if "unit" in meta_dict else ""
@@ -235,7 +250,10 @@ def nexus_data(selected_columns,group,group_df,debug=True):
                 ds_time = nx.tree.NXfield(tmp[tag_value].values, name=t, units=unit)
                 ds_conc.append(ds_time)
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
-        print(ds_aux)
+        for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
+            if tag in tmp:
+                nxdata.attrs[tag] = tmp[tag].values
+
         if len(ds_aux) > 0:
             for index, a in enumerate(ds_aux_tags):
                 nxdata[a] = ds_aux[index]
@@ -335,7 +353,7 @@ def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=Tr
 # grouped_dataframes = m2n.group_samplesdf(df_samples,callback=cb)
 def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONCENTRATION_.*loValue$'):
     if cols_unique is None:
-        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
+        selected_columns = [col for col in df_samples.columns if col not in ["loValue","upValue","loQualifier","upQualifier","errQualifier","errorValue","textValue","REPLICATE","EXPERIMENT"] and not bool(re.match(_pattern, col))]
     else:
         selected_columns = [col for col in cols_unique if col in df_samples.columns]
     #dropna is to include missing values

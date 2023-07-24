@@ -114,7 +114,7 @@ class EffectRecord(AmbitModel):
 
             if key in ["REPLICATE","EXPERIMENT"]:
                 if isinstance(value, dict):
-                    conditions[key] = value["loValue"]
+                    conditions[key] = str(value["loValue"])
                 else:
                     #if math.isnan(value):
                         #continue
