@@ -201,8 +201,6 @@ def format_name(meta_dict,key, default = ""):
 def nexus_data(selected_columns,group,group_df,condcols,debug=False):
     try:
         meta_dict = dict(zip(selected_columns, group))
-        print(meta_dict)
-        print(condcols)
         #print(group_df.columns)
         tmp = group_df.dropna(axis=1,how="all")
         if debug:
@@ -250,12 +248,15 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 if tag in ["REPLICATE","EXPERIMENT"]:
                     unit = None
                     int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
-                    ds_aux.append(nx.tree.NXfield(int_array, name= tag))
-                    ds_aux_tags.append(tag)
+                    #ds_aux.append(nx.tree.NXfield(int_array, name= tag))
+                    #ds_aux_tags.append(tag)
+                    ds_conc.append(nx.tree.NXfield(int_array, name= tag))
                 else:
                     str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
-                    ds_aux.append(nx.tree.NXfield(str_array, name= tag))
-                    ds_aux_tags.append(tag)
+                    #add as axis
+                    ds_conc.append(nx.tree.NXfield(str_array, name= tag))
+                    #ds_aux.append(nx.tree.NXfield(str_array, name= tag))
+                    #ds_aux_tags.append(tag)
             else:
                 tag_value = "{}_loValue".format(tag)
                 tag_unit = "{}_unit".format(tag)
