@@ -253,6 +253,10 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
 
         for tag in ["loQualifier","upQualifier","textValue","errQualifier"]:
             if tag in tmp:
+                vals = tmp[tag].unique()
+                if len(vals)==1 and (vals[0]=="" or vals[0]=="="):
+                    #skip if all qualifiers are empty or '=' tbd also for nans
+                    continue
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
                 #nxdata.attrs[tag] =str_array
                 #print(str_array.dtype,str_array)
@@ -312,38 +316,42 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     df_samples,df_controls,resultcols, condcols = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
-    grouped_dataframes, selected_columns = group_samplesdf(df_samples, cols_unique = None)
 
     index = 1
-    try:
-        for group, group_df in grouped_dataframes:
-            try:
-                #print(group_df.info())
-                nxdata,meta_dict = nexus_data(selected_columns,group,group_df,condcols)
+    df_titles = ["data","controls"]
+    for num,df in enumerate([df_samples,df_controls]):
+        if df is None:
+            continue
+        grouped_dataframes, selected_columns = group_samplesdf(df, cols_unique = None)
+        try:
+            for group, group_df in grouped_dataframes:
                 try:
-                    method = entry["experiment_documentation"].attrs["method"]
-                except:
-                    method = ""
-                nxdata.title = "{} ({} by {})".format(meta_dict["endpoint"],method,pa.citation.owner)
-                #print(meta_dict)
+                    #print(group_df.info())
+                    nxdata,meta_dict = nexus_data(selected_columns,group,group_df,condcols)
+                    try:
+                        method = entry["experiment_documentation"].attrs["method"]
+                    except:
+                        method = ""
+                    nxdata.title = "{} ({} by {})".format(meta_dict["endpoint"],method,pa.citation.owner)
+                    #print(meta_dict)
 
-                endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
+                    endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
 
-                endpointtype_group = getattr(entry, endpointtype, None)
-                if endpointtype_group is None:
-                    endpointtype_group = nx.tree.NXgroup()
-                    endpointtype_group.name = "endpointtype"
-                    endpointtype_group.attrs["endpointtype"] = endpointtype
-                    entry[endpointtype] = endpointtype_group
-                nxdata.name = ""
-                entryid = "data_{}_{}".format(index,meta_dict["endpoint"])
-                endpointtype_group[entryid] = nxdata
-                index = index + 1
+                    endpointtype_group = getattr(entry, endpointtype, None)
+                    if endpointtype_group is None:
+                        endpointtype_group = nx.tree.NXgroup()
+                        endpointtype_group.name = "endpointtype"
+                        endpointtype_group.attrs["endpointtype"] = endpointtype
+                        entry[endpointtype] = endpointtype_group
+                    nxdata.name = ""
+                    entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
+                    endpointtype_group[entryid] = nxdata
+                    index = index + 1
 
-            except Exception as xx:
-                print(traceback.format_exc().print_exc())
-    except Exception as err:
-        raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
+                except Exception as xx:
+                    print(traceback.format_exc().print_exc())
+        except Exception as err:
+            raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
 
     return entry
 
