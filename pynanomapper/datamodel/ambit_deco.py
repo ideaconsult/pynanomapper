@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from functools import wraps
-from . import measurements
+from . import ambit
 
 def add_ambitmodel_method(cls):
     def decorator(fun):

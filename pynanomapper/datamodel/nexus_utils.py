@@ -1,7 +1,7 @@
 import numpy as np
 from pydantic import validate_arguments
 
-from . import measurements as mx
+from . import ambit as mx
 from . ambit_deco import add_ambitmodel_method
 import nexusformat.nexus as nx
 import pandas as pd
@@ -218,10 +218,12 @@ def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
         import  pynanomapper.datamodel.measurements as m2n
         from pynanomapper.datamodel.nexus_utils import to_nexus
         import nexusformat.nexus.tree as nx
-        import traceback
-
+        substance="GRCS-18f0f0e8-b5f4-39bc-b8f8-9c869c8bd82f"
+        url = "https://apps.ideaconsult.net/gracious/substance/{}?media=application/json".format(substance)
+        response = requests.get(url)
+        sjson = response.json()
         nxroot = nx.NXroot()
-        substances = m2n.Substances(**pjson)
+        substances = m2n.Substances(**sjson)
         for substance in substances.substance:
             url = "{}/composition?media=application/json".format(substance.URI)
             response = requests.get(url)
