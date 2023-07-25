@@ -123,11 +123,21 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
     instrument = nx.NXinstrument()
     parameters = nx.NXcollection()
     environment = nx.NXenvironment()
-    sample = nx.tree.NXsample()
+
+    if not "substance" in nx_root:
+        nx_root["substance"] = nx.NXgroup()
+    substance_id = 'substance/{}'.format(papp.owner.substance.uuid)
+    if not substance_id in nx_root:
+        nx_root[substance_id] = nx.NXsample()
+    #now the actual sample
+    sample = nx.NXsample()
+    nx_root['{}/sample'.format(entry_id)] = sample
+    nx_root['{}/sample/substance'.format(entry_id)] = nx.NXlink(substance_id)
+
+    #parameters
     nx_root['{}/instrument'.format(entry_id)] = instrument
     nx_root['{}/parameters'.format(entry_id)] = parameters
     nx_root['{}/environment'.format(entry_id)] = environment
-    nx_root['{}/sample'.format(entry_id)] = sample
 
     if not (papp.parameters is None):
         for prm in papp.parameters:
@@ -343,7 +353,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                         endpointtype_group.name = "endpointtype"
                         endpointtype_group.attrs["endpointtype"] = endpointtype
                         entry[endpointtype] = endpointtype_group
-                    nxdata.name = ""
+                    nxdata.name = df_titles[num]
                     entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
                     endpointtype_group[entryid] = nxdata
                     index = index + 1
