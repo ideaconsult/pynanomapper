@@ -13,7 +13,7 @@ import numbers
     ProtocolApplication to nexus entry (NXentry)
 
     Args:
-        papp (ProtocolApplication): The numerator.
+        papp (ProtocolApplication): The object to be written into nexus format.
         nx_root (nx.NXroot()): Nexus root (or None).
 
     Returns:
@@ -200,6 +200,40 @@ def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
         #    break
     return nx_root
 
+"""
+    SubstanceRecord to nexus entry (NXentry)
+
+    Args:
+        substance record (SubstanceRecord): The object to be written.
+        nx_root (nx.NXroot()): Nexus root (or None).
+
+    Returns:
+        nx_root: Nexus root
+
+    Raises:
+        Exception: on parse
+
+    Examples:
+        import  pynanomapper.datamodel.measurements as m2n
+        from pynanomapper.datamodel.nexus_utils import to_nexus
+        import nexusformat.nexus.tree as nx
+        import traceback
+
+        nxroot = nx.NXroot()
+        substances = m2n.Substances(**pjson)
+        for substance in substances.substance:
+            print(type(substance))
+            url = "{}/study?media=application/json".format(substance.URI)
+            response = requests.get(url)
+            sjson = response.json()
+        substance.study = m2n.Study(**sjson).study
+        try:
+            ne = substance.to_nexus(nxroot)
+        except Exception as err:
+            print(substance.URI)
+            print(err)
+        nxroot.save("example.nxs",mode="w")
+"""
 @add_ambitmodel_method(mx.SubstanceRecord)
 def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
     if nx_root == None:
