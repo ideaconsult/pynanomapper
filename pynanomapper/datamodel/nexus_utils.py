@@ -223,7 +223,11 @@ def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
         nxroot = nx.NXroot()
         substances = m2n.Substances(**pjson)
         for substance in substances.substance:
-            print(type(substance))
+            url = "{}/composition?media=application/json".format(substance.URI)
+            response = requests.get(url)
+            pjson = response.json()
+            cmp = m2n.Composition(**pjson)
+            substance.composition = cmp.composition # note the assignment
             url = "{}/study?media=application/json".format(substance.URI)
             response = requests.get(url)
             sjson = response.json()
