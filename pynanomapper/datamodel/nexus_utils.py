@@ -34,10 +34,17 @@ import numbers
 def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
     if nx_root == None:
         nx_root = nx.NXroot()
+
     #https://manual.nexusformat.org/classes/base_classes/NXentry.html
     try:
-        entry_id = "entry_{}.{}_{}".format(papp.protocol.topcategory,papp.protocol.category.code,papp.uuid)
-    except:
+        if not papp.protocol.topcategory in nx_root:
+            nx_root[papp.protocol.topcategory] = nx.NXgroup()
+        if not papp.protocol.category.code in nx_root[papp.protocol.topcategory]:
+            nx_root[papp.protocol.topcategory][papp.protocol.category.code] = nx.NXgroup()
+        provider = "" if papp.citation.owner is None else papp.citation.owner.replace("/","_").upper()
+        entry_id = "{}/{}/entry_{}_{}".format(papp.protocol.topcategory,papp.protocol.category.code,provider,papp.uuid)
+    except Exception as err:
+        #print(err,papp.citation.owner)
         entry_id = "entry_{}".format(papp.uuid)
 
     nxentry = nx.tree.NXentry()
@@ -80,17 +87,17 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
         if not (papp.protocol is None):
             experiment_documentation = nx.NXnote()
             nx_root['{}/experiment_documentation'.format(entry_id)] = experiment_documentation
-
-            category = nx.NXgroup()
-            experiment_documentation["category"] = category
-            category.attrs["topcategory"] = papp.protocol.topcategory
-            category.attrs["code"] = papp.protocol.category.code
-            category.attrs["term"] = papp.protocol.category.term
-            category.attrs["title"] = papp.protocol.category.title
-            category.attrs["endpoint"] = papp.protocol.endpoint
-            for guide in papp.protocol.guideline:
-                experiment_documentation["guideline"] = papp.protocol.guideline
-                break
+            experiment_documentation["date"] = papp.updated
+            #category = nx.NXgroup()
+            #experiment_documentation["category"] = category
+            experiment_documentation.attrs["topcategory"] = papp.protocol.topcategory
+            experiment_documentation.attrs["code"] = papp.protocol.category.code
+            experiment_documentation.attrs["term"] = papp.protocol.category.term
+            experiment_documentation.attrs["title"] = papp.protocol.category.title
+            experiment_documentation.attrs["endpoint"] = papp.protocol.endpoint
+            experiment_documentation.attrs["guideline"] = papp.protocol.guideline
+            if "E.method" in papp.parameters or "ASSAY" in papp.parameters["ASSAY"]:
+                experiment_documentation.attrs["method"]  = papp.parameters["E.method"]
     except Exception as err:
         raise Exception("ProtocolApplication: protocol parsing error " + str(err)) from err
 
@@ -100,7 +107,13 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
         if papp.citation != None:
             nx_root[citation_id]["title"] = papp.citation.title
             nx_root[citation_id]["year"] = papp.citation.year
-            nx_root[citation_id]["owner"] = papp.citation.owner
+            nx_root[citation_id].attrs["owner"] = papp.citation.owner
+            doi = extract_doi(papp.citation.title)
+            if not doi is None:
+                nx_root[citation_id]["doi"] = doi
+            if papp.citation.title.startswith("http"):
+                nx_root[citation_id]["url"] = papp.citation.title
+
         #url, doi, description
     except Exception as err:
         raise Exception("ProtocolApplication: citation data parsing error " + str(err)) from err
@@ -212,13 +225,14 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
         ds_aux = []
         ds_aux_tags = []
         ds_errors = None
-        for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
-            if c in tmp.columns:
-                tmp = tmp.sort_values(by=[c])
-                c_tag = c
-                c_unittag = "{}_unit".format(c_tag.replace("_loValue",""))
-                c_unit = meta_dict[c_unittag] if c_unittag in tmp.columns else ""
-                ds_conc.append(nx.tree.NXfield(tmp[c].values, name=c_tag, units=c_unit))
+
+        #for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
+        #    if c in tmp.columns:
+        #        tmp = tmp.sort_values(by=[c])
+        #        c_tag = c
+        #        c_unittag = "{}_unit".format(c_tag.replace("_loValue",""))
+        #        c_unit = meta_dict[c_unittag] if c_unittag in tmp.columns else ""
+        #        ds_conc.append(nx.tree.NXfield(tmp[c].values, name=c_tag, units=c_unit))
 
 
         if "loValue" in tmp:
@@ -395,3 +409,13 @@ def group_samplesdf(df_samples, cols_unique=None,callback=None,_pattern = r'CONC
         for group, group_df in grouped_dataframes:
             callback(selected_columns,group,group_df)
     return grouped_dataframes,selected_columns
+
+def extract_doi(input_str):
+    # Regular expression pattern to match DOI
+    doi_pattern = r"(10\.\d{4,}(?:\.\d+)*\/\S+)"
+    # Search for the DOI pattern in the input string
+    match = re.search(doi_pattern, input_str)
+    if match:
+        return match.group(1)  # Return the matched DOI
+    else:
+        return None  # Return None if DOI not found
