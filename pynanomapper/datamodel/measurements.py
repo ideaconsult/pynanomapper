@@ -1,5 +1,5 @@
-from typing import List, TypeVar, Generic
-from pydantic import BaseModel, create_model, validator
+from typing import List, TypeVar, Generic, Any
+from pydantic import BaseModel,Field,AnyUrl, create_model, validator, root_validator
 from enum import Enum
 
 import typing
@@ -261,6 +261,79 @@ class ReferenceSubstance(AmbitModel):
     i5uuid : Optional[str] = None
     uri: Optional[str] = None
 
+class TypicalProportion(AmbitModel):
+    precision: Optional[str] = Field(None, regex=r'^\S+$')
+    value: Optional[float] = None
+    unit: Optional[str] = Field(None, regex=r'^\S+$')
+
+class RealProportion(AmbitModel):
+    lowerPrecision: Optional[str] = None
+    lowerValue: Optional[float] = None
+    upperPrecision: Optional[str] = None
+    upperValue: Optional[float] = None
+    unit: Optional[str] = Field(None, regex=r'^\S+$')
+
+class ComponentProportion(AmbitModel):
+    typical: TypicalProportion
+    real: RealProportion
+    function_as_additive: Optional[float] = None
+
+    class Config:
+        use_enum_values = True
+
+
+class Compound(AmbitModel):
+    URI: Optional[AnyUrl] = None
+    structype: Optional[str] = None
+    metric: Optional[float] = None
+    name: Optional[str] = None
+    cas: Optional[str] = None #Field(None, regex=r'^\d{1,7}-\d{2}-\d$')
+    einecs: Optional[str] = None #Field(None, regex=   r'^[A-Za-z0-9/@+=(),:;\[\]{}\-.]+$')
+    inchikey: Optional[str] = None #Field(None, regex=r'^[A-Z\-]{27}$')
+    inchi: Optional[str] =  None
+    formula: Optional[str] = None
+
+class Component(BaseModel):
+    compound: Compound
+    values: Dict[str, Any]
+    #facets: list
+    #bundles: dict
+
+class CompositionEntry(AmbitModel):
+    component: Component
+    compositionUUID: Optional[str] = None
+    compositionName: Optional[str] = None
+    relation: Optional[str] = "HAS_COMPONENT"
+    proportion: Optional[ComponentProportion] = None
+    hidden: bool = False
+
+def update_compound_features(composition : List[CompositionEntry], feature):
+            # Modify the composition based on the feature
+    for entry in composition:
+        for key,value in entry.component.values.items():
+            if feature[key]["sameAs"] == "http://www.opentox.org/api/1.1#CASRN":
+                entry.component.compound.cas = value
+            elif feature[key]["sameAs"] == "http://www.opentox.org/api/1.1#EINECS":
+                entry.component.compound.einecs = value
+            elif feature[key]["sameAs"] == "http://www.opentox.org/api/1.1#ChemicalName":
+                entry.component.compound.name = value
+
+    return composition
+
+class Composition(AmbitModel):
+    composition : List[CompositionEntry] = None
+    feature : dict
+
+
+
+    @root_validator
+    def update_composition(cls, values):
+        composition = values.get('composition')
+        feature = values.get('feature')
+        if composition and feature:
+            values['composition'] = update_compound_features(composition,feature)
+        return values
+
 class SubstanceRecord(AmbitModel):
     URI : Optional[str] = None
     ownerUUID : Optional[str] = None
@@ -274,7 +347,7 @@ class SubstanceRecord(AmbitModel):
     # composition : List[]
     # externalIdentifiers : List[]
     study: Optional[List[ProtocolApplication]] = None
-
+    composition: Optional[List[CompositionEntry]] = None
     def to_json(self):
         def substance_record_encoder(obj):
             if isinstance(obj, List):

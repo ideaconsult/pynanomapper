@@ -8,6 +8,7 @@ import pandas as pd
 import re
 import traceback
 import numbers
+import math
 
 """
     ProtocolApplication to nexus entry (NXentry)
@@ -255,6 +256,22 @@ def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
     nx_root[substance_id].attrs["substanceType"] = substance.substanceType
     nx_root[substance_id].attrs["ownerName"] = substance.ownerName
     nx_root[substance_id].attrs["ownerUUID"] = substance.ownerUUID
+
+    if substance.composition != None:
+        for index,ce in enumerate(substance.composition):
+            component = nx.NXsample_component()
+            #name='' cas='' einecs='' inchikey='YVZATJAPAZIWIL-UHFFFAOYSA-M' inchi='InChI=1S/H2O.Zn/h1H2;/q;+1/p-1' formula='HOZn'
+            component.name = ce.component.compound.name
+            component.einecs = ce.component.compound.einecs
+            component.cas = ce.component.compound.cas
+            component.formula = ce.component.compound.formula
+            component.inchi = ce.component.compound.inchi
+            component.inchikey = ce.component.compound.inchikey
+            component.description = ce.relation
+            #print(ce.component.values)
+            #print(ce.proportion)
+            #print(ce.relation)
+            nx_root["{}/{}_{}".format(substance_id,ce.relation,index)] = component
     return nx_root
 
 @add_ambitmodel_method(mx.Substances)
@@ -265,7 +282,13 @@ def to_nexus(substances : mx.Substances, nx_root: nx.NXroot() = None ):
         substance.to_nexus(nx_root);
     return nx_root
 
-import math
+@add_ambitmodel_method(mx.Composition)
+def to_nexus(composition : mx.Composition, nx_root: nx.NXroot() = None ):
+    if nx_root == None:
+        nx_root = nx.NXroot()
+
+    return nx_root
+
 
 def format_name(meta_dict,key, default = ""):
     name = meta_dict[key] if key in meta_dict else default
