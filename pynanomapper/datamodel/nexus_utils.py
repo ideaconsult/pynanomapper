@@ -204,9 +204,23 @@ def to_nexus(study : mx.Study, nx_root: nx.NXroot() = None ):
 def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
     if nx_root == None:
         nx_root = nx.NXroot()
+
     if not (substance.study is None):
         for papp in substance.study:
             papp.to_nexus(nx_root);
+
+    if not "substance" in nx_root:
+        nx_root["substance"] = nx.NXgroup()
+    substance_id = 'substance/{}'.format(substance.i5uuid)
+    if not substance_id in nx_root:
+        nx_root[substance_id] = nx.NXsample()
+    print(substance.name)
+    nx_root[substance_id].attrs["uuid"] = substance.i5uuid
+    nx_root[substance_id].name = substance.name
+    nx_root[substance_id].attrs["publicname"] = substance.publicname
+    nx_root[substance_id].attrs["substanceType"] = substance.substanceType
+    nx_root[substance_id].attrs["ownerName"] = substance.ownerName
+    nx_root[substance_id].attrs["ownerUUID"] = substance.ownerUUID
     return nx_root
 
 @add_ambitmodel_method(mx.Substances)
