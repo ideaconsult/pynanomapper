@@ -96,8 +96,10 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             experiment_documentation.attrs["title"] = papp.protocol.category.title
             experiment_documentation.attrs["endpoint"] = papp.protocol.endpoint
             experiment_documentation.attrs["guideline"] = papp.protocol.guideline
-            if "E.method" in papp.parameters or "ASSAY" in papp.parameters["ASSAY"]:
-                experiment_documentation.attrs["method"]  = papp.parameters["E.method"]
+            for tag in ["E.method","ASSAY"]:
+                if tag in papp.parameters:
+                    experiment_documentation.attrs["method"]  = papp.parameters[tag]
+
     except Exception as err:
         raise Exception("ProtocolApplication: protocol parsing error " + str(err)) from err
 
@@ -220,8 +222,8 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
             display(tmp)
 
         ds_conc = []
+        ds_conditions = []
         ds_response = None
-        ds_time = None
         ds_aux = []
         ds_aux_tags = []
         ds_errors = None
@@ -257,6 +259,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 ds_aux.append(nx.tree.NXfield(str_array, name= tag))
                 ds_aux_tags.append(tag)
 
+        primary_axis = None
         for tag in condcols:
             if tag in tmp.columns:
                 if tag in ["REPLICATE","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE","EXPERIMENT"]:
@@ -264,12 +267,12 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
                     #ds_aux.append(nx.tree.NXfield(int_array, name= tag))
                     #ds_aux_tags.append(tag)
-                    ds_conc.append(nx.tree.NXfield(int_array, name= tag))
+                    ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
                 else:
                     try:
                         str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
                         #add as axis
-                        ds_conc.append(nx.tree.NXfield(str_array, name= tag))
+                        ds_conditions.append(nx.tree.NXfield(str_array, name= tag))
                         #ds_aux.append(nx.tree.NXfield(str_array, name= tag))
                         #ds_aux_tags.append(tag)
                     except Exception as err_condition:
@@ -279,14 +282,21 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 tag_unit = "{}_unit".format(tag)
                 if tag_value in tmp.columns:
                     unit = tmp[tag_unit].unique()[0] if tag_unit in tmp.columns else None
-                    ds_time = nx.tree.NXfield(tmp[tag_value].values, name=tag, units=unit)
-                    ds_conc.append(ds_time)
+                    axis = nx.tree.NXfield(tmp[tag_value].values, name=tag, units=unit)
+                    ds_conc.append(axis)
+                    if tag == "CONCENTRATION":
+                        primary_axis = tag
+
+        ds_conc.extend(ds_conditions)
 
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        nxdata.name = meta_dict["endpoint"]
         nxdata.attrs["endpoint"] = meta_dict["endpoint"]
+        if not primary_axis is None:
+            nxdata.attrs["{}_indices".format(primary_axis)] = 0
         if "endpointtype" in meta_dict:
             nxdata.attrs["endpointtype"] = meta_dict["endpointtype"]
-        if "unit" in meta_dict:
+        if "unit" in meta_dict and not (meta_dict["unit"] is None):
             nxdata.attrs["unit"] = meta_dict["unit"]
 
 
@@ -310,6 +320,11 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
             try:
                 #print(group_df.info())
                 nxdata,meta_dict = nexus_data(selected_columns,group,group_df,condcols)
+                try:
+                    method = entry["experiment_documentation"].attrs["method"]
+                except:
+                    method = ""
+                nxdata.title = "{} ({} by {})".format(meta_dict["endpoint"],method,pa.citation.owner)
                 #print(meta_dict)
 
                 endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
