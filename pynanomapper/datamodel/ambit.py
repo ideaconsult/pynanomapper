@@ -24,6 +24,7 @@ class Value(AmbitModel):
     errQualifier: Optional[str] = None
     errorValue: Optional[float] = None
 
+
 class EndpointCategory(AmbitModel):
     code: str
     term: Optional[str]
@@ -35,6 +36,14 @@ class Protocol(AmbitModel):
     endpoint: Optional[str] = None
     guideline: List[str] = None
 
+    def to_json(self):
+        def protocol_encoder(obj):
+            if isinstance(obj, EndpointCategory):
+                return obj.__dict__
+            return obj
+        protocol_dict = self.dict()
+        return json.dumps(protocol_dict, default=protocol_encoder)
+
 class EffectResults(AmbitModel):
     loQualifier: Optional[str] = None
     loValue: Optional[float] = None
@@ -45,26 +54,14 @@ class EffectResults(AmbitModel):
     errorValue: Optional[float] = None
     unit: Optional[str] = None
 
-class EffectsResultsArray(AmbitModel):
-    axes: List[NDArray] = None
-    signal: Union[NDArray, None] = None
-    errors_low: Union[NDArray, None] = None
-    errors_high: Union[NDArray, None] = None
-    class Config:
-        arbitrary_types_allowed = True
 
-
-class EffectRecord(AmbitModel):
+class EffectMetadata(AmbitModel):
     endpoint: str
     endpointtype: Optional[str] = None
-    result: EffectResults = None
-    result_array: Optional[EffectsResultsArray] = None
-    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
     idresult: Optional[int] = None
     endpointGroup: Optional[int] = None
     endpointSynonyms: List[str] = None
     sampleID: Optional[str] = None
-
     @validator('endpoint', pre=True)
     def clean_endpoint(cls, v):
         if v is None:
@@ -79,12 +76,6 @@ class EffectRecord(AmbitModel):
         else:
             return v.replace("/","_")
 
-    @classmethod
-    def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None):
-        if conditions is None:
-            conditions = {}
-        return cls(endpoint=endpoint, conditions=conditions)
-
     def addEndpointSynonym(self, endpointSynonym: str):
         if self.endpointSynonyms is None:
             self.endpointSynonyms = []
@@ -94,6 +85,29 @@ class EffectRecord(AmbitModel):
         if self.endpointSynonyms:
             return ", ".join(self.endpointSynonyms)
         return ""
+
+    def to_json(self):
+        def effect_record_encoder(obj):
+            if isinstance(obj, List):
+                return [item.__dict__ for item in obj]
+            return obj
+
+        return json.dumps(self.__dict__, default=effect_record_encoder)
+
+    class Config:
+        allow_population_by_field_name = True
+
+
+
+class EffectRecord(EffectMetadata):
+    result: EffectResults = None
+    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
+
+    @classmethod
+    def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None):
+        if conditions is None:
+            conditions = {}
+        return cls(endpoint=endpoint, conditions=conditions)
 
     def to_json(self):
         def effect_record_encoder(obj):
@@ -134,8 +148,7 @@ class EffectRecord(AmbitModel):
                     parameters[key] = Value(**value)
         return cls(**data)
 
-    class Config:
-        allow_population_by_field_name = True
+
 
 EffectRecord = create_model('EffectRecord', __base__=EffectRecord)
 
@@ -188,7 +201,32 @@ class SampleLink(AmbitModel):
     class Config:
         allow_population_by_field_name = True
 
+    def to_json(self):
+        def custom_encoder(obj):
+            if isinstance(obj, BaseModel):
+                return obj.__dict__
+            return obj
+        return json.dumps(self, default=custom_encoder)
 
+"""
+    ProtocolApplication : store results for single assay and a single sample
+
+    Args:
+        papp (ProtocolApplication): The object to be written into nexus format.
+
+    Returns:
+        protocol: Protocol
+        effects: List[EffectRecord]
+
+    Examples:
+        from typing import List
+        from pynanomapper.datamodel.ambit import EffectRecord, Protocol, EndpointCategory, ProtocolApplication
+        effect_list: List[EffectRecord] = []
+        effect_list.append(EffectRecord(endpoint="Endpoint 1", unit="Unit 1", loValue=5.0))
+        effect_list.append(EffectRecord(endpoint="Endpoint 2", unit="Unit 2", loValue=10.0))
+        papp = ProtocolApplication(protocol=Protocol(topcategory="P-CHEM",category=EndpointCategory(code="XYZ")),effects=effect_list)
+        papp
+"""
 class ProtocolApplication(AmbitModel):
     uuid: Optional[str] = None
     #reliability: Optional[ReliabilityParams]
@@ -196,8 +234,8 @@ class ProtocolApplication(AmbitModel):
     interpretationCriteria: Optional[str] = None
     parameters: Optional[Dict[str, Union[str, Value, None]]] = None
     citation: Optional[Citation]
-    effects: List[EffectRecord]
-    owner : Optional[SampleLink]
+    effects: List[EffectRecord] #List[Union[EffectRecord,EffectArray]]
+    owner : Optional[SampleLink] = None
     protocol: Optional[Protocol] = None
     investigation_uuid: Optional[str] = None
     assay_uuid: Optional[str] = None
@@ -230,13 +268,13 @@ class ProtocolApplication(AmbitModel):
         return cleaned_params
 
     def to_json(self):
-        def protocol_application_encoder(obj):
-            if isinstance(obj, Value):
+        def custom_encoder(obj):
+            if isinstance(obj, BaseModel):
                 return obj.__dict__
             return obj
 
-        return json.dumps(self.__dict__, default=protocol_application_encoder)
-
+        return json.dumps(self, default=custom_encoder)
+    
 ProtocolApplication = create_model('ProtocolApplication', __base__=ProtocolApplication)
 
 # parsed_json["substance"][0]
