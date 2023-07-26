@@ -5,6 +5,7 @@ from enum import Enum
 import typing
 from typing import Dict, Optional, Union
 import json
+from json import JSONEncoder
 import numpy as np
 from numpy.typing import NDArray
 from .ambit_deco import (add_ambitmodel_method)
@@ -60,13 +61,39 @@ class EffectResult(AmbitModel):
 
 EffectResult = create_model('EffectResult', __base__=EffectResult)
 
-class EffectMetadata(AmbitModel):
+
+class ValueArray(AmbitModel):
+    unit: Optional[str] = None
+    #the arrays can in fact contain strings, we don't need textValue!
+    values: Union[NDArray, None] = None
+    errQualifier: Optional[str] = None
+    errorValue: Optional[Union[NDArray, None]] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @classmethod
+    def create(cls,  values : NDArray = None, unit : str = None, errorValue : NDArray = None, errQualifier : str = None  ):
+        return cls(values = values, unit=unit,errorValue = errorValue, errQualifier = errQualifier)
+
+    def to_json(self):
+        def value_array_encoder(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj.__dict__
+
+        return json.dumps(self, default=value_array_encoder)
+
+class EffectRecord(AmbitModel):
     endpoint: str
     endpointtype: Optional[str] = None
+    result: EffectResult = None
+    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
     idresult: Optional[int] = None
     endpointGroup: Optional[int] = None
     endpointSynonyms: List[str] = None
     sampleID: Optional[str] = None
+
     @validator('endpoint', pre=True)
     def clean_endpoint(cls, v):
         if v is None:
@@ -101,29 +128,6 @@ class EffectMetadata(AmbitModel):
 
     class Config:
         allow_population_by_field_name = True
-
-class ValueArray(AmbitModel):
-    unit: Optional[str] = None
-    #the arrays can in fact contain strings, we don't need textValue!
-    values: Union[NDArray, None] = None
-    errQualifier: Optional[str] = None
-    errorValue: Union[NDArray, None] = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class EffectArray(EffectMetadata):
-    signal: ValueArray = None
-    axes: Optional[Dict[str, ValueArray]] = None
-    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
-    @classmethod
-    def create(cls,  signal : ValueArray = None, axes : Dict[str, ValueArray] = None ):
-        return cls(signal = signal, axes = axes)
-
-class EffectRecord(EffectMetadata):
-    result: EffectResult = None
-    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
 
     @classmethod
     def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None, result : EffectResult = None):
@@ -174,6 +178,30 @@ class EffectRecord(EffectMetadata):
 
 
 EffectRecord = create_model('EffectRecord', __base__=EffectRecord)
+
+
+class EffectArray(EffectRecord):
+    signal: ValueArray = None
+    axes: Optional[Dict[str, ValueArray]] = None
+
+    @classmethod
+    def create(cls,  signal : ValueArray = None, axes : Dict[str, ValueArray] = None ):
+        return cls(signal = signal, axes = axes)
+
+    class EffectArrayEncoder(JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, ValueArray):
+                return obj.__dict__
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return super().default(obj)
+
+    def to_json(self):
+        data = self.dict(exclude={'axes', 'signal'})
+        data['signal'] = self.signal.__dict__ if self.signal else None
+        data['axes'] = {key: value.__dict__ for key, value in self.axes.items()} if self.axes else None
+        return json.dumps(data, cls=self.EffectArrayEncoder)
+
 
 class ProtocolEffectRecord(EffectRecord):
     protocol: Protocol
