@@ -44,7 +44,7 @@ class Protocol(AmbitModel):
         protocol_dict = self.dict()
         return json.dumps(protocol_dict, default=protocol_encoder)
 
-class EffectResults(AmbitModel):
+class EffectResult(AmbitModel):
     loQualifier: Optional[str] = None
     loValue: Optional[float] = None
     upQualifier: Optional[str] = None
@@ -54,6 +54,11 @@ class EffectResults(AmbitModel):
     errorValue: Optional[float] = None
     unit: Optional[str] = None
 
+    @classmethod
+    def create(cls, loValue: float = None, unit: str = None, **kwargs):
+        return cls(loValue = loValue, unit = unit, **kwargs)
+
+EffectResult = create_model('EffectResult', __base__=EffectResult)
 
 class EffectMetadata(AmbitModel):
     endpoint: str
@@ -97,25 +102,43 @@ class EffectMetadata(AmbitModel):
     class Config:
         allow_population_by_field_name = True
 
+class ValueArray(AmbitModel):
+    unit: Optional[str] = None
+    #the arrays can in fact contain strings, we don't need textValue!
+    values: Union[NDArray, None] = None
+    errQualifier: Optional[str] = None
+    errorValue: Union[NDArray, None] = None
 
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class EffectArray(EffectMetadata):
+    signal: ValueArray = None
+    axes: Optional[Dict[str, ValueArray]] = None
+    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
+    @classmethod
+    def create(cls,  signal : ValueArray = None, axes : Dict[str, ValueArray] = None ):
+        return cls(signal = signal, axes = axes)
 
 class EffectRecord(EffectMetadata):
-    result: EffectResults = None
+    result: EffectResult = None
     conditions: Optional[Dict[str, Union[str, Value, None]]] = None
 
     @classmethod
-    def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None):
+    def create(cls, endpoint: str = None, conditions: Dict[str, Union[str, Value, None]] = None, result : EffectResult = None):
         if conditions is None:
             conditions = {}
-        return cls(endpoint=endpoint, conditions=conditions)
+        return cls(endpoint=endpoint, conditions=conditions, result = result)
 
     def to_json(self):
-        def effect_record_encoder(obj):
-            if isinstance(obj, List):
-                return [item.__dict__ for item in obj]
+        def custom_encoder(obj):
+            if isinstance(obj, BaseModel):
+                return obj.__dict__
             return obj
 
-        return json.dumps(self.__dict__, default=effect_record_encoder)
+        return json.dumps(self, default=custom_encoder)
+
 
     @validator('conditions', pre=True)
     def clean_parameters(cls, v):
@@ -234,7 +257,7 @@ class ProtocolApplication(AmbitModel):
     interpretationCriteria: Optional[str] = None
     parameters: Optional[Dict[str, Union[str, Value, None]]] = None
     citation: Optional[Citation]
-    effects: List[EffectRecord] #List[Union[EffectRecord,EffectArray]]
+    effects: List[Union[EffectRecord,EffectArray]]
     owner : Optional[SampleLink] = None
     protocol: Optional[Protocol] = None
     investigation_uuid: Optional[str] = None
@@ -274,7 +297,7 @@ class ProtocolApplication(AmbitModel):
             return obj
 
         return json.dumps(self, default=custom_encoder)
-    
+
 ProtocolApplication = create_model('ProtocolApplication', __base__=ProtocolApplication)
 
 # parsed_json["substance"][0]
