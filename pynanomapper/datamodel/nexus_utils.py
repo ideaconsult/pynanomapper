@@ -97,9 +97,10 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             experiment_documentation.attrs["title"] = papp.protocol.category.title
             experiment_documentation.attrs["endpoint"] = papp.protocol.endpoint
             experiment_documentation.attrs["guideline"] = papp.protocol.guideline
-            for tag in ["E.method","ASSAY"]:
-                if tag in papp.parameters:
-                    experiment_documentation.attrs["method"]  = papp.parameters[tag]
+            if not papp.parameters is None:
+                for tag in ["E.method","ASSAY"]:
+                    if tag in papp.parameters:
+                        experiment_documentation.attrs["method"]  = papp.parameters[tag]
 
     except Exception as err:
         raise Exception("ProtocolApplication: protocol parsing error " + str(err)) from err
@@ -127,13 +128,16 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
 
     if not "substance" in nx_root:
         nx_root["substance"] = nx.NXgroup()
-    substance_id = 'substance/{}'.format(papp.owner.substance.uuid)
-    if not substance_id in nx_root:
-        nx_root[substance_id] = nx.NXsample()
+
     #now the actual sample
     sample = nx.NXsample()
     nx_root['{}/sample'.format(entry_id)] = sample
-    nx_root['{}/sample/substance'.format(entry_id)] = nx.NXlink(substance_id)
+
+    if papp.owner != None:
+        substance_id = 'substance/{}'.format(papp.owner.substance.uuid)
+        if not substance_id in nx_root:
+            nx_root[substance_id] = nx.NXsample()
+            nx_root['{}/sample/substance'.format(entry_id)] = nx.NXlink(substance_id)
 
     #parameters
     nx_root['{}/instrument'.format(entry_id)] = instrument
@@ -445,7 +449,10 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
 
 def effects2df(effects,drop_parsed_cols=True):
     # Convert the list of EffectRecord objects to a list of dictionaries
-    effect_records_dicts = [er.dict() for er in effects]
+    effectrecord_only = list(filter(lambda item: not isinstance(item, mx.EffectArray), effects))
+    if not effectrecord_only: #empty
+        return (None,None, None,None)
+    effect_records_dicts = [er.dict() for er in effectrecord_only]
     # Convert the list of dictionaries to a DataFrame
     df = pd.DataFrame(effect_records_dicts)
     _tag= "conditions"
@@ -483,6 +490,8 @@ def papp_mash(df, dfcols, condcols, drop_parsed_cols=True):
 # df_samples, df_controls = m2n.papp2df(pa, _col="CONCENTRATION")
 def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=True):
     df, dfcols,resultcols, condcols = effects2df(pa.effects,drop_parsed_cols)
+    if df is None:
+        return None,None,None,None
     if _col in df.columns:
         df_samples = df.loc[df[_col].apply(lambda x: isinstance(x, dict))]
         df_controls = df.loc[df[_col].apply(lambda x: isinstance(x, str))]
