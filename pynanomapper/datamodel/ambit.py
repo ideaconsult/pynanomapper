@@ -126,6 +126,12 @@ class EffectRecord(AmbitModel):
 
         return json.dumps(self.__dict__, default=effect_record_encoder)
 
+    def to_dict(self):
+        data = self.dict(exclude_none=True)
+        if self.result:
+            data['result'] = self.result.dict()
+        return data
+
     class Config:
         allow_population_by_field_name = True
 
@@ -202,6 +208,15 @@ class EffectArray(EffectRecord):
         data['axes'] = {key: value.__dict__ for key, value in self.axes.items()} if self.axes else None
         return json.dumps(data, cls=self.EffectArrayEncoder)
 
+    def to_dict(self):
+        data = self.dict(exclude_none=True)
+        if self.signal:
+            data['signal'] = self.signal.dict()
+        if self.axes:
+            data['axes'] = {key: value.dict() for key, value in self.axes.items()}
+        return data
+
+EffectArray = create_model('EffectArray', __base__=EffectArray)
 
 class ProtocolEffectRecord(EffectRecord):
     protocol: Protocol
@@ -296,7 +311,7 @@ class ProtocolApplication(AmbitModel):
         allow_population_by_field_name = True
 
     @classmethod
-    def create(cls,  protocol: Protocol = None , effects: List[EffectRecord] = None,**kwargs):
+    def create(cls,  protocol: Protocol = None , effects: List[Union[EffectRecord,EffectArray]] = None,**kwargs):
         if protocol is None:
             protocol = Protocol()
         if effects is None:
@@ -319,12 +334,22 @@ class ProtocolApplication(AmbitModel):
         return cleaned_params
 
     def to_json(self):
-        def custom_encoder(obj):
-            if isinstance(obj, BaseModel):
-                return obj.__dict__
-            return obj
+        def encode_numpy(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-        return json.dumps(self, default=custom_encoder)
+        data = self.dict(exclude={'effects'})
+        data['effects'] = [effect.dict() for effect in self.effects]
+        if self.citation:
+            data['citation'] = self.citation.dict()
+        if self.parameters:
+            data['parameters'] = {key: value.dict() for key, value in self.parameters.items()}
+        if self.owner:
+            data['owner'] = self.owner.dict()
+        if self.protocol:
+            data['protocol'] = self.protocol.dict()
+        return json.dumps(data, default=encode_numpy, indent=2)
 
 ProtocolApplication = create_model('ProtocolApplication', __base__=ProtocolApplication)
 
@@ -345,6 +370,9 @@ class Study(AmbitModel):
             print(papp)
     """
     study: List[ProtocolApplication]
+    def to_json(self) -> str:
+        data = {'study': [pa.dict() for pa in self.study]}
+        return json.dumps(data)
 
 class ReferenceSubstance(AmbitModel):
     i5uuid : Optional[str] = None
