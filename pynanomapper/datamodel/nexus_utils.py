@@ -9,6 +9,7 @@ import re
 import traceback
 import numbers
 import math
+from typing import List
 
 """
     ProtocolApplication to nexus entry (NXentry)
@@ -42,7 +43,10 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             nx_root[papp.protocol.topcategory] = nx.NXgroup()
         if not papp.protocol.category.code in nx_root[papp.protocol.topcategory]:
             nx_root[papp.protocol.topcategory][papp.protocol.category.code] = nx.NXgroup()
-        provider = "" if papp.citation.owner is None else papp.citation.owner.replace("/","_").upper()
+        try:
+            provider = "" if papp.citation.owner is None else papp.citation.owner.replace("/","_").upper()
+        except:
+            provider = "@"
         entry_id = "{}/{}/entry_{}_{}".format(papp.protocol.topcategory,papp.protocol.category.code,provider,papp.uuid)
     except Exception as err:
         #print(err,papp.citation.owner)
@@ -405,7 +409,22 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
     except Exception as err:
         raise Exception("EffectRecords: grouping error {} {} {}".format(selected_columns,group,err)) from err
 
+def effectarray2data(effect: mx.EffectArray):
+
+    signal = nx.tree.NXfield(effect.signal.values, name=effect.endpoint, units=effect.signal.unit)
+    axes = []
+    for key in effect.axes:
+        axes.append(nx.tree.NXfield( effect.axes[key].values, name=key, units= effect.axes[key].unit))
+    return nx.tree.NXdata(signal,axes)
+
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
+    effectarrays_only : List[mx.EffectArray] = list(filter(lambda item: isinstance(item, mx.EffectArray), pa.effects))
+    if effectarrays_only: # if we have EffectArray in the pa list
+        for effect  in effectarrays_only:
+            nxdata = effectarray2data(effect)
+            entry[effect.endpoint] = nxdata
+            nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
+
     df_samples,df_controls,resultcols, condcols = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
 
     index = 1

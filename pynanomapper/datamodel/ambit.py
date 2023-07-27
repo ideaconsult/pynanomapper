@@ -252,6 +252,11 @@ class Citation(AmbitModel):
     year: Optional[str] = None
     title: str
     owner: str
+    @classmethod
+    def create(cls,  owner: str, citation_title: str, year: str = None):
+        return cls(owner=owner, title=citation_title, year=year)
+
+Citation = create_model('Citation', __base__=Citation)
 
 class Company(AmbitModel):
     uuid: Optional[str] = None
@@ -264,6 +269,10 @@ class SampleLink(AmbitModel):
     substance: Sample
     company: Company = Company(name="Default company")
 
+    @classmethod
+    def create(cls,  sample_uuid: str, sample_provider: str):
+        return cls(substance=Sample(sample_uuid), company=Company(name=sample_provider))
+
     class Config:
         allow_population_by_field_name = True
 
@@ -273,6 +282,8 @@ class SampleLink(AmbitModel):
                 return obj.__dict__
             return obj
         return json.dumps(self, default=custom_encoder)
+
+SampleLink = create_model('SampleLink', __base__=SampleLink)
 
 """
     ProtocolApplication : store results for single assay and a single sample
