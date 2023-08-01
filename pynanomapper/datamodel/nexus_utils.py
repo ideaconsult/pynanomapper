@@ -34,6 +34,7 @@ from typing import List
 """
 @add_ambitmodel_method(mx.ProtocolApplication)
 def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
+
     if nx_root == None:
         nx_root = nx.NXroot()
 
@@ -422,6 +423,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     if effectarrays_only: # if we have EffectArray in the pa list
         for effect  in effectarrays_only:
             nxdata = effectarray2data(effect)
+            nxdata.attr["interpretation"] = "spectrum"
             entry[effect.endpoint] = nxdata
             nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
 
