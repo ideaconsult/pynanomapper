@@ -420,11 +420,14 @@ def effectarray2data(effect: mx.EffectArray):
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     effectarrays_only : List[mx.EffectArray] = list(filter(lambda item: isinstance(item, mx.EffectArray), pa.effects))
+    _default = None
     if effectarrays_only: # if we have EffectArray in the pa list
         for effect  in effectarrays_only:
             nxdata = effectarray2data(effect)
-            nxdata.attr["interpretation"] = "spectrum"
+            nxdata.attrs["interpretation"] = "spectrum"
             entry[effect.endpoint] = nxdata
+            if _default is None:
+                entry.attrs["default"] = effect.endpoint
             nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
 
     df_samples,df_controls,resultcols, condcols = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
