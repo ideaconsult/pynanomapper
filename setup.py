@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, setup
 
 with open("README.md", "r") as fs:
     long_description = fs.read()
 
 setup(
     name="pynanomapper",
-    version="1.1.1",
+    version="1.2.0-beta",
     author="Nina JELIAZKOVA",
     author_email="jeliazkova.nina@gmail.com",
     description="eNanoMapper API client",
@@ -32,11 +32,10 @@ setup(
     ],
     keywords="enanomapper nanoinformatics cheminformatics ambit",
     python_requires="~=3.5",
-    packages=[
-        "pynanomapper",
-    ],
+    packages=find_packages(),
     install_requires=[
         "jproperties",
+        "nexusformat",
         "pandas",
         "pyyaml >= 5.1",
         "requests",
