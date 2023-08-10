@@ -13,6 +13,7 @@ from typing import List
 
 """
     ProtocolApplication to nexus entry (NXentry)
+    Tries to follow https://manual.nexusformat.org/rules.html
 
     Args:
         papp (ProtocolApplication): The object to be written into nexus format.
@@ -60,9 +61,9 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
 
     nx_root['{}/definition'.format(entry_id)] = papp.__class__.__name__
     nxmap = nx_root['{}/definition'.format(entry_id)]
-    nxmap.attrs["PROTOCOL_APPLICATION_UUID"]="entry_identifier_uuid"
-    nxmap.attrs["INVESTIGATION_UUID"]="collection_identifier"
-    nxmap.attrs["ASSAY_UUID"]="experiment_identifier"
+    nxmap.attrs["PROTOCOL_APPLICATION_UUID"]="@entry_identifier_uuid"
+    nxmap.attrs["INVESTIGATION_UUID"]="@collection_identifier"
+    nxmap.attrs["ASSAY_UUID"]="@experiment_identifier"
     nxmap.attrs["Protocol"]= "experiment_documentation"
     nxmap.attrs["Citation"]= "reference"
     nxmap.attrs["Substance"]= "sample"
@@ -155,6 +156,8 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                 value = papp.parameters[prm]
                 target = environment
                 if  "instrument" in prm.lower():
+                    target = instrument
+                if  "wavelength" in prm.lower():
                     target = instrument
                 elif  "sample" in prm.lower():
                     target = sample
@@ -264,7 +267,6 @@ def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
     substance_id = 'substance/{}'.format(substance.i5uuid)
     if not substance_id in nx_root:
         nx_root[substance_id] = nx.NXsample()
-    print(substance.name)
     nx_root[substance_id].attrs["uuid"] = substance.i5uuid
     nx_root[substance_id].name = substance.name
     nx_root[substance_id].attrs["publicname"] = substance.publicname
@@ -286,7 +288,7 @@ def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
             #print(ce.component.values)
             #print(ce.proportion)
             #print(ce.relation)
-            nx_root["{}/{}_{}".format(substance_id,ce.relation,index)] = component
+            nx_root["{}/{}_{}".format(substance_id,ce.relation.replace("HAS_",""),index)] = component
     return nx_root
 
 @add_ambitmodel_method(mx.Substances)
@@ -316,7 +318,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
         tmp = group_df.dropna(axis=1,how="all")
         if debug:
             display(tmp)
-
+        _interpretation = "scalar"
         ds_conc = []
         ds_conditions = []
         ds_response = None
@@ -386,10 +388,12 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     ds_conc.append(axis)
                     if tag == "CONCENTRATION":
                         primary_axis = tag
+                        _interpretation = "spectrum"
 
         ds_conc.extend(ds_conditions)
 
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        nxdata.attrs["interpretation"] = _interpretation
         nxdata.name = meta_dict["endpoint"]
         nxdata.attrs["endpoint"] = meta_dict["endpoint"]
         if not primary_axis is None:

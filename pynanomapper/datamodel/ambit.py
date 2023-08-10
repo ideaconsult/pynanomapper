@@ -423,7 +423,7 @@ class Compound(AmbitModel):
 
 class Component(BaseModel):
     compound: Compound
-    values: Dict[str, Any]
+    values: Dict[str, Any] = None
     #facets: list
     #bundles: dict
 
