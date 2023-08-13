@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pynanomapper.datamodel.ambit as mx
 import numpy as np
 from typing import Dict, Optional, Union, List
-from pynanomapper.datamodel.nexus_utils import to_nexus
+from pynanomapper.datamodel.nexus_writer import to_nexus
 import numpy.typing as npt
 import json
 import nexusformat.nexus.tree as nx
