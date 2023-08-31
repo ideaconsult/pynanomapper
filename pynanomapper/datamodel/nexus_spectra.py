@@ -1,4 +1,5 @@
 import ramanchada2 as rc2
+from ramanchada2.misc.types.fit_peaks_result import FitPeaksResult
 import matplotlib.pyplot as plt
 import pynanomapper.datamodel.ambit as mx
 import numpy as np
@@ -66,3 +67,22 @@ def spe2ambit(x: npt.NDArray, y: npt.NDArray, meta: Dict,
               investigation=investigation,
               prefix=prefix)
     return papp
+
+
+def peaks2nxdata(fitres:FitPeaksResult):
+    df = fitres.to_dataframe_peaks()
+    nxdata = nx.NXdata()
+    axes = ["amplitude","center","sigma","beta","fwhm","height"]
+    for a in axes:
+        nxdata[a] = nx.NXfield(df[a].values, name=a)
+        a_err = f"{a}_errors"
+        nxdata[a_err] = nx.NXfield(df[f"{a}_stderr"].values, name=a_err)
+    str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in df.index.values])
+    nxdata["group_peak"] = nx.NXfield(str_array, name="group_peak")
+    #nxdata.signal = 'amplitude'
+    nxdata.attrs['signal'] = "amplitude"
+    nxdata.attrs["auxiliary_signals"] = ["height","beta","sigma","fwhm"]
+    nxdata.attrs['axes'] = ["center"]
+    nxdata.attrs["interpretation"] = "spectrum"
+    nxdata.attrs["{}_indices".format("center")] = 0
+    return nxdata
