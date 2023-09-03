@@ -118,7 +118,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
         if papp.citation != None:
             nx_root[citation_id]["title"] = papp.citation.title
             nx_root[citation_id]["year"] = papp.citation.year
-            nx_root[citation_id].attrs["owner"] = papp.citation.owner
+            nx_root[citation_id]["owner"] = papp.citation.owner
             doi = extract_doi(papp.citation.title)
             if not doi is None:
                 nx_root[citation_id]["doi"] = doi
@@ -158,6 +158,8 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                 target = environment
                 if  "instrument" in prm.lower():
                     target = instrument
+                if  "technique" in prm.lower():
+                    target = instrument
                 if  "wavelength" in prm.lower():
                     target = instrument
                 elif  "sample" in prm.lower():
@@ -172,7 +174,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                     target = nx_root[entry_id]["experiment_documentation"]
                 elif ("OPERATOR" == prm):
                     #target = instrument
-                    nx_root[entry_id]["experiment_documentation"]
+                    target = nx_root[entry_id]["experiment_documentation"]
                 elif (prm.startswith("T.")):
                     target = instrument
 
@@ -413,7 +415,10 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
 
         ds_conc.extend(ds_conditions)
 
-        nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        if len(ds_conc)>0:
+            nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
+        else:
+            nxdata = nx.tree.NXdata(ds_response, errors=ds_errors)
         nxdata.attrs["interpretation"] = _interpretation
 
         nxdata.name = meta_dict["endpoint"]
@@ -463,11 +468,11 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                 entry.attrs["default"] = effect.endpoint
             nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
 
-    df_samples,df_controls,resultcols, condcols = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL"],drop_parsed_cols=True)
+    df_samples,df_controls,resultcols, condcols, df_aggregated = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL"],drop_parsed_cols=True)
 
     index = 1
-    df_titles = ["data","controls"]
-    for num,df in enumerate([df_samples,df_controls]):
+    df_titles = ["data","controls","derived"]
+    for num,df in enumerate([df_samples,df_controls,df_aggregated]):
         if df is None:
             continue
         grouped_dataframes, selected_columns = group_samplesdf(df, cols_unique = None)
@@ -559,10 +564,13 @@ def papp2df(pa: mx.ProtocolApplication, _cols=["CONCENTRATION"],drop_parsed_cols
 
     df_samples = None
     df_controls = None
+    df_aggregated = None
     for _col in _cols:
         if _col in condcols:
             df_samples = df.loc[df[_col].apply(lambda x: isinstance(x, dict))]
             df_controls = df.loc[df[_col].apply(lambda x: isinstance(x, str))]
+            #we can have aggregated values with NaN in concentraiton columns
+            df_aggregated = df.loc[df[_col].isna()]
             break
     if  df_samples is None:
         df_samples = df
@@ -572,7 +580,12 @@ def papp2df(pa: mx.ProtocolApplication, _cols=["CONCENTRATION"],drop_parsed_cols
     if not (df_controls is None):
         cols_to_process = [col for col in condcols if col !=_col]
         df_controls = papp_mash(df_controls.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
-    return df_samples,df_controls,resultcols, condcols
+
+    if not (df_aggregated is None):
+        cols_to_process = [col for col in condcols if col !=_col]
+        df_aggregated = papp_mash(df_aggregated.reset_index(drop=True), dfcols, cols_to_process,drop_parsed_cols)
+
+    return df_samples,df_controls,resultcols, condcols, df_aggregated
 
 
 #
