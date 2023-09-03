@@ -384,27 +384,14 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 if tag in ["REPLICATE","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE","EXPERIMENT"]:
                     unit = None
                     int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
-                    #ds_aux.append(nx.tree.NXfield(int_array, name= tag))
-                    #ds_aux_tags.append(tag)
                     ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
                 else:
-                    conditions_as_attributes = False
                     try:
-                        vals = tmp[tag].unique()
-                        conditions_as_attributes = True
-                    except:
-                        pass
-                    if conditions_as_attributes:
-                        _attributes[tag] = vals
-                    else:
-                        try:
-                            str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
-                            #add as axis
-                            ds_conditions.append(nx.tree.NXfield(str_array, name= tag))
-                            #ds_aux.append(nx.tree.NXfield(str_array, name= tag))
-                            #ds_aux_tags.append(tag)
-                        except Exception as err_condition:
-                            print(err_condition,tag,tmp[tag].values)
+                        str_array = np.array(['' if (x is None ) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
+                        #add as axis
+                        ds_conditions.append(nx.tree.NXfield(str_array, name= tag))
+                    except Exception as err_condition:
+                        print(err_condition,tag,tmp[tag].values)
             else:
                 tag_value = "{}_loValue".format(tag)
                 tag_unit = "{}_unit".format(tag)
@@ -481,11 +468,12 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     for num,df in enumerate([df_samples,df_controls,df_aggregated]):
         if df is None:
             continue
+
         grouped_dataframes, selected_columns = group_samplesdf(df, cols_unique = None)
         try:
             for group, group_df in grouped_dataframes:
                 try:
-                    #print(group_df.info())
+
                     nxdata,meta_dict = nexus_data(selected_columns,group,group_df,condcols)
                     try:
                         method = entry["experiment_documentation"].attrs["method"]
@@ -565,6 +553,7 @@ def papp_mash(df, dfcols, condcols, drop_parsed_cols=True):
 # df_samples, df_controls = m2n.papp2df(pa, _col="CONCENTRATION")
 def papp2df(pa: mx.ProtocolApplication, _cols=["CONCENTRATION"],drop_parsed_cols=True):
     df, dfcols,resultcols, condcols = effects2df(pa.effects,drop_parsed_cols)
+    #display(df)
     if df is None:
         return None,None,None,None
 
