@@ -386,7 +386,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     unit = tmp[tag_unit].unique()[0] if tag_unit in tmp.columns else None
                     axis = nx.tree.NXfield(tmp[tag_value].values, name=tag, units=unit)
                     ds_conc.append(axis)
-                    if tag == "CONCENTRATION":
+                    if tag == "CONCENTRATION" or tag == "DOSE" or tag == "AMOUNT_OF_MATERIAL" :
                         primary_axis = tag
                         _interpretation = "spectrum"
 
@@ -434,11 +434,12 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                 entry.attrs["default"] = effect.endpoint
             nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
 
-    df_samples,df_controls,resultcols, condcols = papp2df(pa, _col="CONCENTRATION",drop_parsed_cols=True)
+    df_samples,df_controls,resultcols, condcols = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL"],drop_parsed_cols=True)
 
     index = 1
     df_titles = ["data","controls"]
     for num,df in enumerate([df_samples,df_controls]):
+        print(">>NUM",num,df_titles[num],df.shape)
         if df is None:
             continue
         grouped_dataframes, selected_columns = group_samplesdf(df, cols_unique = None)
@@ -454,16 +455,23 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                     nxdata.title = "{} ({} by {})".format(meta_dict["endpoint"],method,pa.citation.owner)
                     #print(meta_dict)
 
-                    endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
+                    entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
 
+                    endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
+                    nxdata.name = df_titles[num]
                     endpointtype_group = getattr(entry, endpointtype, None)
                     if endpointtype_group is None:
-                        endpointtype_group = nx.tree.NXgroup()
-                        endpointtype_group.name = "endpointtype"
-                        endpointtype_group.attrs["endpointtype"] = endpointtype
+                        if endpointtype=="DEFAULT" or endpointtype=="RAW_DATA":
+                            endpointtype_group = nx.tree.NXgroup()
+                        else:
+                            endpointtype_group = nx.tree.NXprocess()
+                            endpointtype_group["NOTE"] = nx.tree.NXnote()
+                            endpointtype_group["NOTE"].attrs["description"] = endpointtype
+
+                        endpointtype_group.name = endpointtype
                         entry[endpointtype] = endpointtype_group
-                    nxdata.name = df_titles[num]
-                    entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
+                        endpointtype_group.attrs["default"] = entryid
+
                     endpointtype_group[entryid] = nxdata
                     index = index + 1
 
@@ -516,14 +524,19 @@ def papp_mash(df, dfcols, condcols, drop_parsed_cols=True):
 # pa = ProtocolApplication(**json_data)
 # from pynanomapper.datamodel import measurements2nexus as m2n
 # df_samples, df_controls = m2n.papp2df(pa, _col="CONCENTRATION")
-def papp2df(pa: mx.ProtocolApplication, _col="CONCENTRATION",drop_parsed_cols=True):
+def papp2df(pa: mx.ProtocolApplication, _cols=["CONCENTRATION"],drop_parsed_cols=True):
     df, dfcols,resultcols, condcols = effects2df(pa.effects,drop_parsed_cols)
     if df is None:
         return None,None,None,None
-    if _col in df.columns:
-        df_samples = df.loc[df[_col].apply(lambda x: isinstance(x, dict))]
-        df_controls = df.loc[df[_col].apply(lambda x: isinstance(x, str))]
-    else:
+
+    df_samples = None
+    df_controls = None
+    for _col in _cols:
+        if _col in condcols:
+            df_samples = df.loc[df[_col].apply(lambda x: isinstance(x, dict))]
+            df_controls = df.loc[df[_col].apply(lambda x: isinstance(x, str))]
+            break
+    if  df_samples is None:
         df_samples = df
         df_controls = None
     #df_string.dropna(axis=1,how="all",inplace=True)

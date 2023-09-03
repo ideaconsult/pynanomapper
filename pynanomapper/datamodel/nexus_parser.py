@@ -19,12 +19,28 @@ class NexusParser:
             nx_class = item.attrs.get('NX_class', None)
             if nx_class == "NXdata":
                 self.parse_data(item,entry.name==default)
+
+            elif nx_class == "NXenvironment":
+                pass
+            elif nx_class == "NXinstrument":
+                pass
+            elif nx_class == "NXcite":
+                pass
+            elif nx_class == "NXcollection":
+                pass
+            elif nx_class == "NXnote":
+                pass
+            elif nx_class == "NXsample":
+                self.parse_sample(item)
             else:
                 print("ENTRY ",item.name, ' ', nx_class)
 
     def parse_sample(self,group):
         nx_class = group.attrs.get('NX_class', None)
-        print(group.name, ' ', nx_class)
+        if nx_class == "NXsample_component":
+            pass
+        else:
+            print(group.name, ' ', nx_class)
 
     def parse(self,file_path  :str):
         with h5py.File(file_path, 'r') as file:
@@ -38,6 +54,7 @@ class NexusParser:
                     self.parse_entry(group)
                 elif nx_class == "NXsample":
                     self.parse_sample(group)
+
                 else:
                     for name, item in group.items():
                         nx_class = item.attrs.get('NX_class', None)
@@ -64,7 +81,7 @@ class SpectrumParser(NexusParser):
         signal = entry.attrs.get('signal', None)
         interpretation = entry.attrs.get('interpretation', None)
         axes = entry.attrs.get('axes', None)
-        print(default,signal,interpretation,axes,isinstance(entry[signal], h5py.Dataset))
+        #print(default,signal,interpretation,axes,isinstance(entry[signal], h5py.Dataset))
         y = entry[signal][:]
         for axis in axes:
             x = entry[axis][:]
