@@ -365,15 +365,18 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 if len(vals)==1 and (vals[0]=="" or vals[0]=="="):
                     #skip if all qualifiers are empty or '=' tbd also for nans
                     continue
-                if len(vals)==1 and (vals[0]=="SD"):
+                if len(vals)==1 and tag != "textValue":
                     #skip if all qualifiers are empty or '=' tbd also for nans
                     _attributes[tag] = vals
                     continue
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
                 #nxdata.attrs[tag] =str_array
                 #print(str_array.dtype,str_array)
-                ds_aux.append(nx.tree.NXfield(str_array, name= tag))
-                ds_aux_tags.append(tag)
+                if ds_response is None and tag == "textValue":
+                    ds_response = nx.tree.NXfield(str_array, name= tag)
+                else:
+                    ds_aux.append(nx.tree.NXfield(str_array, name= tag))
+                    ds_aux_tags.append(tag)
 
         primary_axis = None
         for tag in condcols:
@@ -414,6 +417,9 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                         _interpretation = "spectrum"
 
         ds_conc.extend(ds_conditions)
+
+        if len(ds_response)>0:
+            _interpretation = "spectrum" #means vector
 
         if len(ds_conc)>0:
             nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
@@ -491,7 +497,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                     entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
 
                     endpointtype = format_name(meta_dict,"endpointtype","DEFAULT")
-                    nxdata.name = df_titles[num]
+                    nxdata.name = meta_dict["endpoint"]
                     endpointtype_group = getattr(entry, endpointtype, None)
                     if endpointtype_group is None:
                         if endpointtype=="DEFAULT" or endpointtype=="RAW_DATA":
