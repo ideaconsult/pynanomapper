@@ -108,6 +108,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                     if tag in papp.parameters:
                         experiment_documentation.attrs["method"]  = papp.parameters[tag]
 
+
     except Exception as err:
         raise Exception("ProtocolApplication: protocol parsing error " + str(err)) from err
 
@@ -164,17 +165,24 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                 elif  "material" in prm.lower():
                     target = sample
                 elif ("ASSAY" == prm.upper()) or ("E.METHOD" == prm.upper()):
-                    target = instrument
+                    #target = instrument
+                    continue
                 elif ("E.SOP_REFERENCE" == prm):
-                    target = instrument
+                    #target = instrument
+                    target = nx_root[entry_id]["experiment_documentation"]
                 elif ("OPERATOR" == prm):
-                    target = instrument
+                    #target = instrument
+                    nx_root[entry_id]["experiment_documentation"]
                 elif (prm.startswith("T.")):
                     target = instrument
+
                 if "EXPERIMENT_END_DATE" == prm:
                     nx_root[entry_id]["end_time"] = value
                 elif "EXPERIMENT_START_DATE" == prm:
                     nx_root[entry_id]["start_time"] = value
+                elif "__input_file" == prm:
+                    nx_root[entry_id]["experiment_documentation"][prm] = value
+
                 elif isinstance(value,str):
                     target[prm] = nx.NXfield(str(value))
                 elif isinstance(value,mx.Value):
@@ -325,7 +333,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
         ds_aux = []
         ds_aux_tags = []
         ds_errors = None
-
+        _attributes  = {}
         #for c in ["CONCENTRATION","CONCENTRATION_loValue","CONCENTRATION_SURFACE_loValue","CONCENTRATION_MASS_loValue"]:
         #    if c in tmp.columns:
         #        tmp = tmp.sort_values(by=[c])
@@ -355,6 +363,10 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                 if len(vals)==1 and (vals[0]=="" or vals[0]=="="):
                     #skip if all qualifiers are empty or '=' tbd also for nans
                     continue
+                if len(vals)==1 and (vals[0]=="SD"):
+                    #skip if all qualifiers are empty or '=' tbd also for nans
+                    _attributes[tag] = vals
+                    continue
                 str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
                 #nxdata.attrs[tag] =str_array
                 #print(str_array.dtype,str_array)
@@ -371,14 +383,23 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     #ds_aux_tags.append(tag)
                     ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
                 else:
+                    conditions_as_attributes = False
                     try:
-                        str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
-                        #add as axis
-                        ds_conditions.append(nx.tree.NXfield(str_array, name= tag))
-                        #ds_aux.append(nx.tree.NXfield(str_array, name= tag))
-                        #ds_aux_tags.append(tag)
-                    except Exception as err_condition:
-                        print(err_condition,tag,tmp[tag].values)
+                        vals = tmp[tag].unique()
+                        conditions_as_attributes = True
+                    except:
+                        pass
+                    if conditions_as_attributes:
+                        _attributes[tag] = vals
+                    else:
+                        try:
+                            str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
+                            #add as axis
+                            ds_conditions.append(nx.tree.NXfield(str_array, name= tag))
+                            #ds_aux.append(nx.tree.NXfield(str_array, name= tag))
+                            #ds_aux_tags.append(tag)
+                        except Exception as err_condition:
+                            print(err_condition,tag,tmp[tag].values)
             else:
                 tag_value = "{}_loValue".format(tag)
                 tag_unit = "{}_unit".format(tag)
@@ -394,14 +415,22 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
 
         nxdata = nx.tree.NXdata(ds_response, ds_conc, errors=ds_errors)
         nxdata.attrs["interpretation"] = _interpretation
+
         nxdata.name = meta_dict["endpoint"]
-        nxdata.attrs["endpoint"] = meta_dict["endpoint"]
+        _attributes["endpoint"] = meta_dict["endpoint"]
         if not primary_axis is None:
             nxdata.attrs["{}_indices".format(primary_axis)] = 0
         if "endpointtype" in meta_dict:
-            nxdata.attrs["endpointtype"] = meta_dict["endpointtype"]
-        if "unit" in meta_dict and not (meta_dict["unit"] is None):
-            nxdata.attrs["unit"] = meta_dict["unit"]
+            _attributes["endpointtype"] = meta_dict["endpointtype"]
+
+        #unit is per axis/signal
+        #if "unit" in meta_dict and not (meta_dict["unit"] is None):
+        #    nxdata.attrs["unit"] = meta_dict["unit"]
+
+        if len(_attributes) > 0:
+            nxdata["META"] = nx.tree.NXnote()
+            for tag in _attributes:
+                nxdata["META"].attrs[tag] = _attributes[tag]
 
 
         if len(ds_aux) > 0:
@@ -439,7 +468,6 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     index = 1
     df_titles = ["data","controls"]
     for num,df in enumerate([df_samples,df_controls]):
-        print(">>NUM",num,df_titles[num],df.shape)
         if df is None:
             continue
         grouped_dataframes, selected_columns = group_samplesdf(df, cols_unique = None)
