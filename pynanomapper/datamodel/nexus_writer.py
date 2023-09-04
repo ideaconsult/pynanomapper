@@ -385,6 +385,10 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     unit = None
                     int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
                     ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
+                elif tag in ["MATERIAL","TREATMENT"]:
+                    vals = tmp[tag].unique()
+                    if len(vals)==1:
+                        _attributes[tag] = vals
                 else:
                     try:
                         str_array = np.array(['' if (x is None ) else x.encode('ascii', errors='ignore') for x in tmp[tag].values])
