@@ -457,10 +457,24 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
     effectarrays_only : List[mx.EffectArray] = list(filter(lambda item: isinstance(item, mx.EffectArray), pa.effects))
     _default = None
     if effectarrays_only: # if we have EffectArray in the pa list
+        _endpointtype_groups = {}
+        index = 0
         for effect  in effectarrays_only:
+            index = index + 1
+            _group_key = "DEFAULT" if effect.endpointtype is None else effect.endpointtype
+            if not _group_key in _endpointtype_groups:
+                if effect.endpointtype == "RAW_DATA":
+                    _endpointtype_groups[_group_key] = nx.tree.NXgroup()
+                else:
+                    _endpointtype_groups[_group_key] = nx.tree.NXprocess()
+                    endpointtype_group[_group_key]["NOTE"] = nx.tree.NXnote()
+                    endpointtype_group[_group_key]["NOTE"].attrs["description"] = endpointtype
+                entry[_group_key] = _endpointtype_groups[_group_key]
+
             nxdata = effectarray2data(effect)
             nxdata.attrs["interpretation"] = "spectrum"
-            entry[effect.endpoint] = nxdata
+            entryid = "{}_{}".format(effect.endpoint,index)
+            _endpointtype_groups[_group_key][entryid] = nxdata
             if _default is None:
                 entry.attrs["default"] = effect.endpoint
             nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
@@ -559,7 +573,7 @@ def papp2df(pa: mx.ProtocolApplication, _cols=["CONCENTRATION"],drop_parsed_cols
     df, dfcols,resultcols, condcols = effects2df(pa.effects,drop_parsed_cols)
     #display(df)
     if df is None:
-        return None,None,None,None
+        return None,None,None,None,None
 
     df_samples = None
     df_controls = None

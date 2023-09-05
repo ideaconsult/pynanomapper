@@ -12,11 +12,11 @@ import pprint
 import uuid
 
 
-def spe2effect(x: npt.NDArray, y: npt.NDArray):
+def spe2effect(x: npt.NDArray, y: npt.NDArray,endpointtype="RAW_DATA"):
     data_dict: Dict[str, mx.ValueArray] = {
         'x': mx.ValueArray(values = x, unit="cm-1")
     }
-    return mx.EffectArray(endpoint="Raman spectrum",
+    return mx.EffectArray(endpoint="Raman spectrum",endpointtype=endpointtype,
                                     signal = mx.ValueArray(values = y,unit="count"),
                                     axes = data_dict)
 
