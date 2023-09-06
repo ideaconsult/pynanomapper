@@ -201,7 +201,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             raise Exception("ProtocolApplication owner (sample) parsing error " + str(err)) from err
 
     try:
-        process_pa(papp,nx_root[entry_id])
+        process_pa(papp,nx_root[entry_id],nx_root)
     except Exception as err:
         raise Exception("ProtocolApplication: effectrecords parsing error " + str(err)) from err
 
@@ -268,10 +268,6 @@ def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
     if nx_root == None:
         nx_root = nx.NXroot()
 
-    if not (substance.study is None):
-        for papp in substance.study:
-            papp.to_nexus(nx_root);
-
     if not "substance" in nx_root:
         nx_root["substance"] = nx.NXgroup()
     substance_id = 'substance/{}'.format(substance.i5uuid)
@@ -299,6 +295,11 @@ def to_nexus(substance : mx.SubstanceRecord, nx_root: nx.NXroot() = None ):
             #print(ce.proportion)
             #print(ce.relation)
             nx_root["{}/{}_{}".format(substance_id,ce.relation.replace("HAS_",""),index)] = component
+
+    if not (substance.study is None):
+        for papp in substance.study:
+            papp.to_nexus(nx_root);
+
     return nx_root
 
 @add_ambitmodel_method(mx.Substances)
@@ -453,9 +454,17 @@ def effectarray2data(effect: mx.EffectArray):
         axes.append(nx.tree.NXfield( effect.axes[key].values, name=key, units= effect.axes[key].unit))
     return nx.tree.NXdata(signal,axes)
 
-def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
+def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx.NXroot = None):
+
     effectarrays_only : List[mx.EffectArray] = list(filter(lambda item: isinstance(item, mx.EffectArray), pa.effects))
     _default = None
+    try:
+        _path = "/substance/{}".format(pa.owner.substance.uuid)
+        print(_path,nx_root[_path].name)
+        substance_name = nx_root[_path].name
+    except Exception as err:
+        substance_name = ''
+
     if effectarrays_only: # if we have EffectArray in the pa list
         _endpointtype_groups = {}
         index = 0
@@ -477,7 +486,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
             _endpointtype_groups[_group_key][entryid] = nxdata
             if _default is None:
                 entry.attrs["default"] = effect.endpoint
-            nxdata.title = "{} by {}".format(effect.endpoint,pa.citation.owner)
+            nxdata.title = "{} (by {}) {}".format(effect.endpoint,pa.citation.owner,substance_name)
 
     df_samples,df_controls,resultcols, condcols, df_aggregated = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL"],drop_parsed_cols=True)
 
@@ -497,7 +506,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry()):
                         method = entry["experiment_documentation"].attrs["method"]
                     except:
                         method = ""
-                    nxdata.title = "{} ({} by {})".format(meta_dict["endpoint"],method,pa.citation.owner)
+                    nxdata.title = "{} ({} by {}) {}".format(meta_dict["endpoint"],method,pa.citation.owner,substance_name)
                     #print(meta_dict)
 
                     entryid = "{}_{}_{}".format(df_titles[num],index,meta_dict["endpoint"])
