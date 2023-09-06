@@ -4,7 +4,7 @@ import yaml
 import pandas as pd
 import numpy as np
 import logging
-from pandas.io.json import json_normalize
+
 import re
 global logger
 logger = logging.getLogger()

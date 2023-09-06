@@ -2,7 +2,7 @@ from requests.auth import AuthBase
 import requests
 import pandas as pd
 import yaml
-from pandas.io.json import json_normalize
+from pandas import json_normalize
 
 def search_service_protected(url,apikey):
     return (url,apikey)
