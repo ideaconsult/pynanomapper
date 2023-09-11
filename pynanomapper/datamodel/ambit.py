@@ -260,7 +260,7 @@ Citation = create_model('Citation', __base__=Citation)
 
 class Company(AmbitModel):
     uuid: Optional[str] = None
-    name: str
+    name: Optional[str] = None
 
 class Sample(AmbitModel):
     uuid: str
