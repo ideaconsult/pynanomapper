@@ -1,7 +1,5 @@
 import h5py,h5pyd
 import traceback
-import h5pyd._apps.hsdel as hsdel
-import h5pyd._apps.utillib as utillib
 from matplotlib.figure import Figure
 import numpy as np
 from pynanomapper.clients.authservice import QueryService
@@ -55,8 +53,10 @@ class H5Service(H5BasicService):
                     self.create_domain(domain)
                     return domain
                 except IOError as err:
+                    traceback.print_exc()
                     raise(err)
             except Exception as err:
+                traceback.print_exc()
                 raise(err)
 
     def copy_h5layer(self,fin,fout):
@@ -262,8 +262,9 @@ class H5Service(H5BasicService):
                 for s in f._subdomains:
 
                     if not s["name"].endswith("metadata.h5"):
-                        hsdel.deleteDomain(s["name"])
-                        _deleted.append(s["name"])
+                        #hsdel.deleteDomain(s["name"])
+                        #deleted.append(s["name"])
+                        pass
             return _deleted
         except Exception as err:
             raise err
