@@ -25,7 +25,7 @@ def configure_papp(papp: mx.ProtocolApplication,
               sample = "PST",
               sample_provider = "CHARISMA",
               investigation="Round Robin 1",
-              prefix="CRMA"):
+              prefix="CRMA",meta =None):
     papp.citation = mx.Citation(owner=provider,title=investigation,year=2022)
     papp.investigation_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID,investigation))
     papp.assay_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID,"{} {}".format(investigation,provider)))
@@ -65,14 +65,15 @@ def spe2ambit(x: npt.NDArray, y: npt.NDArray, meta: Dict,
               sample = sample,
               sample_provider = sample_provider,
               investigation=investigation,
-              prefix=prefix)
+              prefix=prefix,
+              meta = meta)
     return papp
 
 
 def peaks2nxdata(fitres:FitPeaksResult):
     df = fitres.to_dataframe_peaks()
     nxdata = nx.NXdata()
-    axes = ["amplitude","center","sigma","beta","fwhm","height"]
+    axes = ["height","center","sigma","beta","fwhm","height"]
     for a in axes:
         nxdata[a] = nx.NXfield(df[a].values, name=a)
         a_err = f"{a}_errors"
@@ -80,8 +81,8 @@ def peaks2nxdata(fitres:FitPeaksResult):
     str_array = np.array(['='.encode('ascii', errors='ignore') if (x is None) else x.encode('ascii', errors='ignore') for x in df.index.values])
     nxdata["group_peak"] = nx.NXfield(str_array, name="group_peak")
     #nxdata.signal = 'amplitude'
-    nxdata.attrs['signal'] = "amplitude"
-    nxdata.attrs["auxiliary_signals"] = ["height","beta","sigma","fwhm"]
+    nxdata.attrs['signal'] = "height"
+    nxdata.attrs["auxiliary_signals"] = ["amplitude","beta","sigma","fwhm"]
     nxdata.attrs['axes'] = ["center"]
     nxdata.attrs["interpretation"] = "spectrum"
     nxdata.attrs["{}_indices".format("center")] = 0
