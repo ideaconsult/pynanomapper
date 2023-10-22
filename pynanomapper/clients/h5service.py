@@ -1,4 +1,4 @@
-from authservice import QueryService
+from pynanomapper.clients.authservice import QueryService
 import h5py
 import h5pyd
 import traceback
