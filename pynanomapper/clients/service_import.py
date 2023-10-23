@@ -51,14 +51,21 @@ class ImportService(H5Service):
 
     def import2hsds(self,metadata_file,logs_folder):
         meta_files = pd.read_excel(metadata_file, sheet_name="files",index_col=0)
-        meta_path = pd.read_excel(metadata_file, sheet_name="paths",index_col=0)
-        root = meta_path.loc["path","value"]
+        try:
+            meta_path = pd.read_excel(metadata_file, sheet_name="paths",index_col=0)
+            root = meta_path.loc["path","value"]
+        except:
+            root = ""
         if not os.path.exists(logs_folder):
             os.mkdir(logs_folder)
         log_file = os.path.join(logs_folder,"log.json")
         log = { 'results' : {}, 'errors' : {}, 'delete' : {}}
         for index, row in meta_files.iterrows():
-            file_name = os.path.join(root,index)
+            if os.path.isabs(index):
+                file_name = index
+            else:
+                file_name = os.path.join(root,index)
+
             try:
                 if row["enabled"]:
                     hsds_provider = row["hsds_provider"]
