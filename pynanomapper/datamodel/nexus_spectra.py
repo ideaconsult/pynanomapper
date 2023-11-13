@@ -12,9 +12,9 @@ import pprint
 import uuid
 
 
-def spe2effect(x: npt.NDArray, y: npt.NDArray,endpointtype="RAW_DATA"):
+def spe2effect(x: npt.NDArray, y: npt.NDArray, unit="cm-1",endpointtype="RAW_DATA"):
     data_dict: Dict[str, mx.ValueArray] = {
-        'x': mx.ValueArray(values = x, unit="cm-1")
+        'x': mx.ValueArray(values = x, unit=unit)
     }
     return mx.EffectArray(endpoint="Raman spectrum",endpointtype=endpointtype,
                                     signal = mx.ValueArray(values = y,unit="count"),
@@ -51,22 +51,23 @@ def spe2ambit(x: npt.NDArray, y: npt.NDArray, meta: Dict,
               investigation="Round Robin 1",
               sample = "PST",
               sample_provider = "CHARISMA",
-              prefix="CRMA"):
-    effect_list: List[Union[mx.EffectRecord,mx.EffectArray]] = []
+              prefix="CRMA",endpointtype="RAW_DATA", unit="cm-1",papp=None):
 
-    effect_list.append(spe2effect(x,y))
-
-    papp = mx.ProtocolApplication(protocol=mx.Protocol(topcategory="P-CHEM",
+    if papp is None:
+        effect_list: List[Union[mx.EffectRecord,mx.EffectArray]] = []
+        effect_list.append(spe2effect(x,y,unit,endpointtype))
+        papp = mx.ProtocolApplication(protocol=mx.Protocol(topcategory="P-CHEM",
                             category=mx.EndpointCategory(code="ANALYTICAL_METHODS_SECTION")),
                             effects=effect_list)
-
-    configure_papp(papp,
+        configure_papp(papp,
               instrument=instrument, wavelength=wavelength, provider=provider,
               sample = sample,
               sample_provider = sample_provider,
               investigation=investigation,
               prefix=prefix,
               meta = meta)
+    else:
+        papp.effects.append(spe2effect(x,y,unit,endpointtype))
     return papp
 
 

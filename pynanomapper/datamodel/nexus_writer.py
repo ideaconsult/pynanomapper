@@ -476,8 +476,8 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx
                     _endpointtype_groups[_group_key] = nx.tree.NXgroup()
                 else:
                     _endpointtype_groups[_group_key] = nx.tree.NXprocess()
-                    endpointtype_group[_group_key]["NOTE"] = nx.tree.NXnote()
-                    endpointtype_group[_group_key]["NOTE"].attrs["description"] = endpointtype
+                    _endpointtype_groups[_group_key]["NOTE"] = nx.tree.NXnote()
+                    _endpointtype_groups[_group_key]["NOTE"].attrs["description"] = effect.endpointtype
                 entry[_group_key] = _endpointtype_groups[_group_key]
 
             nxdata = effectarray2data(effect)
