@@ -25,6 +25,9 @@ class Value(AmbitModel):
     errQualifier: Optional[str] = None
     errorValue: Optional[float] = None
 
+    @classmethod
+    def create(cls, loValue: float = None, unit: str = None, **kwargs):
+        return cls(loValue = loValue, unit = unit, **kwargs)
 
 class EndpointCategory(AmbitModel):
     code: str
@@ -88,7 +91,7 @@ class EffectRecord(AmbitModel):
     endpoint: str
     endpointtype: Optional[str] = None
     result: EffectResult = None
-    conditions: Optional[Dict[str, Union[str, Value, None]]] = None
+    conditions: Optional[Dict[str, Union[str, int, float, Value, None]]] = None
     idresult: Optional[int] = None
     endpointGroup: Optional[int] = None
     endpointSynonyms: List[str] = None
@@ -159,17 +162,23 @@ class EffectRecord(AmbitModel):
             if value is None:
                 continue
             new_key = key.replace("/", "_") if "/" in key else key
-            if key in ["REPLICATE","EXPERIMENT","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE"]:
+            if value is None:
+                pass
+            elif key in ["REPLICATE","EXPERIMENT","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE"]:
                 if isinstance(value, dict):
                     conditions[new_key] = str(value["loValue"])
+                    #print(key, type(value),value,conditions[new_key])
+                elif isinstance(value, (int, float)):
+                    conditions[new_key] = value
                 else:
-                    #if math.isnan(value):
-                        #continue
+                    #this is to extract nuber from e.g. 'Replicate 1'
                     match = re.search(r'[+-]?\d+(?:\.\d+)?', value)
                     if match:
                         conditions[new_key] = match.group()
+
             else:
                 conditions[new_key] = value
+
         return conditions
 
     @classmethod

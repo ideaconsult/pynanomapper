@@ -384,8 +384,11 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
             if tag in tmp.columns:
                 if tag in ["REPLICATE","BIOLOGICAL_REPLICATE","TECHNICAL_REPLICATE","EXPERIMENT"]:
                     unit = None
-                    int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
-                    ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
+                    try:
+                        int_array = np.array([int(x) if isinstance(x,str) and x.isdigit() else np.nan if (x is None) or math.isnan(x) or (not isinstance(x, numbers.Number)) else int(x) for x in tmp[tag].values])
+                        ds_conditions.append(nx.tree.NXfield(int_array, name= tag))
+                    except Exception as err:
+                        print(tmp[tag].values)
                 elif tag in ["MATERIAL","TREATMENT"]:
                     vals = tmp[tag].unique()
                     if len(vals)==1:
@@ -444,6 +447,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
             print(nxdata.tree)
         return nxdata,meta_dict
     except Exception as err:
+        print("Exception traceback:\n%s", traceback.format_exc())
         raise Exception("EffectRecords: grouping error {} {} {}".format(selected_columns,group,err)) from err
 
 def effectarray2data(effect: mx.EffectArray):
@@ -530,7 +534,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx
                     index = index + 1
 
                 except Exception as xx:
-                    print(traceback.format_exc().print_exc())
+                    print(traceback.format_exc())
         except Exception as err:
             raise Exception("ProtocolApplication: data parsing error {} {}".format(selected_columns,err)) from err
 
