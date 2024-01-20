@@ -168,8 +168,12 @@ class EffectRecord(AmbitModel):
                 if isinstance(value, dict):
                     conditions[new_key] = str(value["loValue"])
                     #print(key, type(value),value,conditions[new_key])
-                elif isinstance(value, (int, float)):
+                elif isinstance(value, int):
                     conditions[new_key] = value
+                elif isinstance(value, float):
+                    print("warning>  Float value {}:{}".format(key, value))
+                    conditions[new_key] = int(value)
+                    raise Exception("warning>  Float value {}:{}".format(key, value))
                 else:
                     #this is to extract nuber from e.g. 'Replicate 1'
                     match = re.search(r'[+-]?\d+(?:\.\d+)?', value)
@@ -512,6 +516,7 @@ class Substances(AmbitModel):
 
     """
     substance: List[SubstanceRecord]
+
     def to_json(self):
         def substances_encoder(obj):
             if isinstance(obj, Substances):
@@ -519,3 +524,30 @@ class Substances(AmbitModel):
             return obj.__dict__
 
         return json.dumps(self, default=substances_encoder)
+
+
+import uuid
+
+def configure_papp(papp: ProtocolApplication,
+              provider="My organisation",
+              sample = "My sample",
+              sample_provider = "PROJECT",
+              investigation="My experiment",
+              year=2024,
+              prefix="XLSX",
+              meta =None):
+    papp.citation = Citation(owner=provider,title=investigation,year=year)
+    papp.investigation_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID,investigation))
+    papp.assay_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID,"{} {}".format(investigation,provider)))
+    papp.parameters = meta
+
+    papp.uuid = "{}-{}".format(prefix,uuid.uuid5(uuid.NAMESPACE_OID,"{} {} {} {} {} {}".format(
+                papp.protocol.category,
+                "" if investigation is None else investigation,
+                "" if sample_provider is None else sample_provider,
+                "" if sample is None else sample,
+                "" if provider is None else provider,
+                "" if meta is None else str(meta))))
+    company=Company(name = sample_provider)
+    substance = Sample(uuid = "{}-{}".format(prefix,uuid.uuid5(uuid.NAMESPACE_OID,sample)))
+    papp.owner = SampleLink(substance = substance,company=company)
