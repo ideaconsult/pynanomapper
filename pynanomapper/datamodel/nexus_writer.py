@@ -407,7 +407,7 @@ def nexus_data(selected_columns,group,group_df,condcols,debug=False):
                     unit = tmp[tag_unit].unique()[0] if tag_unit in tmp.columns else None
                     axis = nx.tree.NXfield(tmp[tag_value].values, name=tag, units=unit)
                     ds_conc.append(axis)
-                    if tag == "CONCENTRATION" or tag == "DOSE" or tag == "AMOUNT_OF_MATERIAL" :
+                    if tag == "CONCENTRATION" or tag == "DOSE" or tag == "AMOUNT_OF_MATERIAL" or tag=="TREATMENT_CONDITION":
                         primary_axis = tag
                         _interpretation = "spectrum"
 
@@ -492,7 +492,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx
                 entry.attrs["default"] = effect.endpoint
             nxdata.title = "{} (by {}) {}".format(effect.endpoint,pa.citation.owner,substance_name)
 
-    df_samples,df_controls,resultcols, condcols, df_aggregated = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL"],drop_parsed_cols=True)
+    df_samples,df_controls,resultcols, condcols, df_aggregated = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL","TREATMENT_CONDITION"],drop_parsed_cols=True)
 
     index = 1
     df_titles = ["data","controls","derived"]
