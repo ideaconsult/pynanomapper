@@ -489,7 +489,7 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx
             entryid = "{}_{}".format(effect.endpoint,index)
             _endpointtype_groups[_group_key][entryid] = nxdata
             if _default is None:
-                entry.attrs["default"] = effect.endpoint
+                entry.attrs["default"] = _group_key
             nxdata.title = "{} (by {}) {}".format(effect.endpoint,pa.citation.owner,substance_name)
 
     df_samples,df_controls,resultcols, condcols, df_aggregated = papp2df(pa, _cols=["CONCENTRATION","DOSE","AMOUNT_OF_MATERIAL","TREATMENT_CONDITION"],drop_parsed_cols=True)
