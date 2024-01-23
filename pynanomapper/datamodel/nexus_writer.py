@@ -54,8 +54,9 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
         #print(err,papp.citation.owner)
         entry_id = "entry_{}".format(papp.uuid)
 
-    nxentry = nx.tree.NXentry()
-    nx_root[entry_id] = nxentry
+
+    if not (entry_id in nx_root):
+        nx_root[entry_id] = nx.tree.NXentry()
 
     nx_root['{}/entry_identifier_uuid'.format(entry_id)] = papp.uuid
 
@@ -92,8 +93,10 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
 
     try:
         if not (papp.protocol is None):
-            experiment_documentation = nx.NXnote()
-            nx_root['{}/experiment_documentation'.format(entry_id)] = experiment_documentation
+            docid = '{}/experiment_documentation'.format(entry_id)
+            if not (docid in nx_root):
+                nx_root[docid] = nx.NXnote()
+            experiment_documentation = nx_root[docid]
             experiment_documentation["date"] = papp.updated
             #category = nx.NXgroup()
             #experiment_documentation["category"] = category
@@ -114,7 +117,8 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
 
     try:
         citation_id = '{}/reference'.format(entry_id)
-        nx_root[citation_id] = nx.NXcite()
+        if not (citation_id in nx_root):
+            nx_root[citation_id] = nx.NXcite()
         if papp.citation != None:
             nx_root[citation_id]["title"] = papp.citation.title
             nx_root[citation_id]["year"] = papp.citation.year
@@ -129,16 +133,14 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
     except Exception as err:
         raise Exception("ProtocolApplication: citation data parsing error " + str(err)) from err
 
-    instrument = nx.NXinstrument()
-    parameters = nx.NXcollection()
-    environment = nx.NXenvironment()
-
     if not "substance" in nx_root:
         nx_root["substance"] = nx.NXgroup()
 
     #now the actual sample
-    sample = nx.NXsample()
-    nx_root['{}/sample'.format(entry_id)] = sample
+    sample_id = '{}/sample'.format(entry_id)
+    if not sample_id in nx_root:
+        nx_root['{}/sample'.format(entry_id)] = nx.NXsample()
+    sample = nx_root['{}/sample'.format(entry_id)]
 
     if papp.owner != None:
         substance_id = 'substance/{}'.format(papp.owner.substance.uuid)
@@ -147,9 +149,17 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
             nx_root['{}/sample/substance'.format(entry_id)] = nx.NXlink(substance_id)
 
     #parameters
-    nx_root['{}/instrument'.format(entry_id)] = instrument
-    nx_root['{}/parameters'.format(entry_id)] = parameters
-    nx_root['{}/environment'.format(entry_id)] = environment
+    if not ('{}/instrument'.format(entry_id) in nx_root):
+        nx_root['{}/instrument'.format(entry_id)] = nx.NXinstrument()
+    instrument = nx_root['{}/instrument'.format(entry_id)]
+
+    if not ('{}/parameters'.format(entry_id) in nx_root):
+        nx_root['{}/parameters'.format(entry_id)] = nx.NXcollection()
+    parameters = nx_root['{}/parameters'.format(entry_id)]
+
+    if not ('{}/environment'.format(entry_id) in nx_root):
+        nx_root['{}/environment'.format(entry_id)] = nx.NXenvironment()
+    environment = nx_root['{}/environment'.format(entry_id)]
 
     if not (papp.parameters is None):
         for prm in papp.parameters:
@@ -203,6 +213,7 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
     try:
         process_pa(papp,nx_root[entry_id],nx_root)
     except Exception as err:
+        print("Exception traceback:\n%s", traceback.format_exc())
         raise Exception("ProtocolApplication: effectrecords parsing error " + str(err)) from err
 
     return nx_root
@@ -459,7 +470,7 @@ def effectarray2data(effect: mx.EffectArray):
     return nx.tree.NXdata(signal,axes)
 
 def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx.NXroot = None):
-
+    #print(entry.tree)
     effectarrays_only : List[mx.EffectArray] = list(filter(lambda item: isinstance(item, mx.EffectArray), pa.effects))
     _default = None
     try:
@@ -470,24 +481,28 @@ def process_pa(pa: mx.ProtocolApplication,entry = nx.tree.NXentry(),nx_root : nx
         substance_name = ''
 
     if effectarrays_only: # if we have EffectArray in the pa list
-        _endpointtype_groups = {}
+        #_endpointtype_groups = {}
         index = 0
         for effect  in effectarrays_only:
             index = index + 1
             _group_key = "DEFAULT" if effect.endpointtype is None else effect.endpointtype
-            if not _group_key in _endpointtype_groups:
+            if not _group_key in entry:
                 if effect.endpointtype == "RAW_DATA":
-                    _endpointtype_groups[_group_key] = nx.tree.NXgroup()
+                    entry[_group_key] = nx.tree.NXgroup()
                 else:
-                    _endpointtype_groups[_group_key] = nx.tree.NXprocess()
-                    _endpointtype_groups[_group_key]["NOTE"] = nx.tree.NXnote()
-                    _endpointtype_groups[_group_key]["NOTE"].attrs["description"] = effect.endpointtype
-                entry[_group_key] = _endpointtype_groups[_group_key]
+                    entry[_group_key] = nx.tree.NXprocess()
+                    entry[_group_key]["NOTE"] = nx.tree.NXnote()
+                    entry[_group_key]["NOTE"].attrs["description"] = effect.endpointtype
+            #    entry[_group_key] = _endpointtype_groups[_group_key]
+
+            entryid = "{}_{}".format(effect.endpoint,index)
+            if entryid in entry[_group_key]:
+                 del entry[_group_key][entryid]
+                 print("replacing {}/{}".format(_group_key,entryid))
 
             nxdata = effectarray2data(effect)
             nxdata.attrs["interpretation"] = "spectrum"
-            entryid = "{}_{}".format(effect.endpoint,index)
-            _endpointtype_groups[_group_key][entryid] = nxdata
+            entry[_group_key][entryid] = nxdata
             if _default is None:
                 entry.attrs["default"] = _group_key
             nxdata.title = "{} (by {}) {}".format(effect.endpoint,pa.citation.owner,substance_name)
