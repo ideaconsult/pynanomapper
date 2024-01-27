@@ -40,6 +40,11 @@ def get_method_metadata(json_blueprint):
     }
     return _header
 
+def get_materials_df():
+    _header = ["","ERM identifiers","ID","Name","CAS","type","Supplier","Supplier code","Batch","Core","BET surface in m²/g"]
+    return pd.DataFrame(columns=_header)
+
+
 def get_template_frame(json_blueprint):
     df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
 
@@ -87,6 +92,8 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
             worksheet.write(0, col_num, value, cell_format_header)
         for row_num in range(1, len(df_info) + 1):
             worksheet.write(row_num, 0, df_info.iloc[row_num - 1, 0], cell_format_right_align)
+        max_length = df_info["param_name"].apply(lambda x: len(str(x))).max()
+        worksheet.set_column(0, 0, max_length + 1 )
 
         #worksheet = writer.sheets['Raw_data']
 
@@ -96,10 +103,23 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
         else:
             new_df = results_table(df_raw,result_name='raw_endpoint',results_conditions='raw_conditions')
             new_df.to_excel(writer, sheet_name='Raw_data', index=False)
+            worksheet = writer.sheets['Raw_data']
+            for i, col in enumerate(new_df.columns):
+                worksheet.set_column(i, i, len(col) + 1 )
+
         if df_result is None:
             pass
         else:
             new_df = results_table(df_result,result_name='result_name',results_conditions='results_conditions')
             new_df.to_excel(writer, sheet_name='Results', index=False)
+            worksheet = writer.sheets['Results']
+            for i, col in enumerate(new_df.columns):
+                worksheet.set_column(i, i, len(col) + 1 )
 
-        #worksheet = writer.sheets['Materials']
+        df_material = get_materials_df()
+        df_material.to_excel(writer, sheet_name='Materials', index=False)
+        worksheet = writer.sheets['Materials']
+        # Set column widths to fit the header text
+        for i, col in enumerate(df_material.columns):
+            worksheet.set_column(i, i, len(col) + 1 )
+
