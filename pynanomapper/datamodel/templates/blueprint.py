@@ -1,5 +1,6 @@
 import pandas as pd
-
+import os
+import json
 
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
@@ -80,7 +81,13 @@ def get_treatment(json_blueprint):
     return pd.DataFrame(tmp)
 
 def get_nmparser_config(json_blueprint):
-    return {}
+    current_directory = os.path.dirname(os.path.abspath(__file__))
+    json_file_path = os.path.join(current_directory, "../../resource/nmparser/DEFAULT_TABLE.json")
+    config = {}
+    with open(json_file_path, 'r') as json_file:
+        # Load the JSON data from the file
+        config = json.load(json_file)
+    return config
 
 def get_template_frame(json_blueprint):
     df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
@@ -129,9 +136,13 @@ def get_template_frame(json_blueprint):
     return df_info,df_result,df_raw
 
 def results_table(df_result,result_name='result_name',results_conditions='results_conditions'):
+    print(df_result)
     unique_result_names = df_result[result_name].unique()
-    unique_conditions = set(condition for conditions in df_result[results_conditions] for condition in conditions)
-    new_header = list(["Material"]) + list(unique_conditions) + list(unique_result_names)
+    new_header = list(["Material"])
+    if results_conditions in df_result.columns:
+        unique_conditions = set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions)
+        new_header = new_header + list(unique_conditions)
+    new_header = new_header + list(unique_result_names)
     return pd.DataFrame(columns=new_header)
 
 
@@ -200,14 +211,6 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
         worksheet.write("B1","Test Data Recording Form (TDRF)")
         worksheet.write("A6","TEST CONDITIONS")
         worksheet.write("B6","Please ensure you also complete a Test Method Description Form (TMDF) for this test type")
-
-
-
-
-
-        #worksheet = writer.sheets['Raw_data']
-
-        #worksheet = writer.sheets['Results']
         if df_raw is None:
             pass
         else:

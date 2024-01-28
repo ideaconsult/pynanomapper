@@ -1,0 +1,123 @@
+{
+	"TEMPLATE_INFO": {
+		"NAME": "Default-table",
+		"VERSION": "Template Wizard XXXX-XX-XX",
+		"TYPE": 1,
+		"ALLOW_QUALIFIER_IN_VALUE_CELL": 1
+	},
+	"DATA_ACCESS": {
+		"SHEET_NAME": "Result_TABLE",
+		"START_ROW": 2,
+		"START_HEADER_ROW": 1,
+		"SHEET_INDEX": 2,
+		"ALLOW_EMPTY": true,
+		"RECOGNITION": "BY_INDEX"
+	},
+
+	"SUBSTANCE_RECORD": {
+		"PUBLIC_NAME": {
+				"SHEET_INDEX": 2,
+				"COLUMN_INDEX": "B"				
+		},
+		"OWNER_NAME": {
+			"ITERATION": "ABSOLUTE_LOCATION",
+			"SHEET_INDEX": 1,
+			"COLUMN_INDEX": "A",
+			"ROW_INDEX": 1				
+		},
+		"SUBSTANCE_NAME": {
+				"SHEET_INDEX": 2,
+				"COLUMN_INDEX": "B"			
+		}
+	},	
+	"PROTOCOL_APPLICATIONS": [
+		{
+			"PROTOCOL_TOP_CATEGORY": "TOX",
+			"PROTOCOL_CATEGORY_CODE": "NPO_1339_SECTION",
+			"PROTOCOL_GUIDELINE": {
+				"guideline1": {
+					"ITERATION": "ABSOLUTE_LOCATION",
+					"SHEET_INDEX": 1,
+					"COLUMN_INDEX": "B",
+					"ROW_INDEX": 18				
+				}
+			},	
+			"PROTOCOL_APPLICATION_UUID": {
+				"SOURCE_COMBINATION": true,
+				"COMBINATION_SEPARATOR": "-",
+				"COLUMN_INDEX": "B",
+				"COLUMN_INDICES": [
+					"B",
+					"C"
+				]
+			},
+			"INVESTIGATION_UUID" : {
+				"ITERATION": "ABSOLUTE_LOCATION",
+				"SHEET_INDEX": 1,
+				"COLUMN_INDEX": "G",
+				"ROW_INDEX": 8				
+			},
+			"CITATION_TITLE": {
+					"ITERATION": "ABSOLUTE_LOCATION",
+					"SHEET_INDEX": 1,
+					"COLUMN_INDEX": "B",
+					"ROW_INDEX": 8				
+			},
+			"CITATION_YEAR": {
+					"ITERATION": "ABSOLUTE_LOCATION",
+					"SHEET_INDEX": 1,
+					"COLUMN_INDEX": "B",
+					"ROW_INDEX": 21				
+			},				
+			"CITATION_OWNER": {
+				"ITERATION": "ABSOLUTE_LOCATION",
+				"SHEET_INDEX": 1,
+				"COLUMN_INDEX": "B",
+				"ROW_INDEX": 9
+			},
+			"PROTOCOL_ENDPOINT": {
+					"ITERATION": "ABSOLUTE_LOCATION",
+					"SHEET_INDEX": 1,
+					"COLUMN_INDEX": "B",
+					"ROW_INDEX": 16			
+			},
+			"PARAMETERS": {
+				"Assay": {
+					"ITERATION": "ABSOLUTE_LOCATION",
+					"SHEET_INDEX": 1,
+					"COLUMN_INDEX": "B",
+					"ROW_INDEX": 14
+				}
+			},
+			"EFFECTS": [
+				{
+					"ENDPOINT": {
+						"ITERATION": "ABSOLUTE_LOCATION",
+						"SHEET_INDEX": 2,
+						"COLUMN_INDEX": "F",
+						"ROW_INDEX": 1		
+					},
+					"VALUE" : {
+						"ITERATION": "ROW_SINGLE",
+						"SHEET_INDEX": 2,
+						"COLUMN_INDEX": "F"
+					},
+					"UNIT" : "",
+					"CONDITIONS" : {
+						"CONCENTRATION": {
+							"COLUMN_INDEX": "D",
+							"UNIT": "ug/cm2"
+						},
+						"REPLICATE" : {
+							"COLUMN_INDEX": "E"
+						},
+						"EXPERIMENT" : {
+							"COLUMN_INDEX": "A"
+						}
+					}
+				}
+			]
+			
+		}
+	]
+}	
