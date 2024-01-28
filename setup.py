@@ -39,5 +39,6 @@ setup(
         "pandas",
         "pyyaml >= 5.1",
         "requests",
+        'XlsxWriter',
     ],
 )
