@@ -4,7 +4,7 @@ import pandas as pd
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
-    print(df.columns)
+    #print(df.columns)
     # Create a new DataFrame with one column
     result_df = pd.DataFrame(columns=['param_name'])
     result_df["type"] = "group"
@@ -79,6 +79,9 @@ def get_treatment(json_blueprint):
         condition_type = isreplicate
     return pd.DataFrame(tmp)
 
+def get_nmparser_config(json_blueprint):
+    return {}
+
 def get_template_frame(json_blueprint):
     df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
     df_sample["type"] = "names"
@@ -110,6 +113,11 @@ def get_template_frame(json_blueprint):
         result_df[["param_name","type","position","datamodel"]],
         get_treatment(json_blueprint)[["param_name","type","position","datamodel"]]
         ], ignore_index=True)
+    #print(df_info)
+#:END: Please do not add information below this line
+#Template version	{{ || version }}
+#Template authors	{{ || acknowledgements }}
+#Template downloaded	{{ || downloaded }}
 
 
     df_info["position"] = range(1, 1 + len(df_info) )
@@ -125,6 +133,7 @@ def results_table(df_result,result_name='result_name',results_conditions='result
     unique_conditions = set(condition for conditions in df_result[results_conditions] for condition in conditions)
     new_header = list(["Material"]) + list(unique_conditions) + list(unique_result_names)
     return pd.DataFrame(columns=new_header)
+
 
 def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
     _guide = [
