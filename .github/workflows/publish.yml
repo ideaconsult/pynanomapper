@@ -1,0 +1,74 @@
+---
+name: Publish Python package to PyPI
+
+on:  # yamllint disable-line rule:truthy
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  POETRY_VERSION: '1.7.1'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+
+  build:
+
+    name: Build the package distribution
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Perform package installation
+        run: poetry install --no-interaction
+
+      - name: Run tests
+        run: poetry run pytest
+
+      - name: Build the package distributions
+        run: poetry build --no-interaction
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pynanomapper-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  publish:
+
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pynanomapper
+    permissions:
+      id-token: write
+
+    steps:
+
+      - name: Retrieve the package distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: pynanomapper-dist
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
