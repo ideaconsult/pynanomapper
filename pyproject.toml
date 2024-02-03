@@ -49,6 +49,18 @@ xlsxwriter = "^3.1.9"
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/ideaconsult/pynanomapper/issues"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+    "integration",
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
