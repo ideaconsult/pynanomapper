@@ -33,7 +33,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries",
 ]
 packages = [
-  { include = "pynanomapper" },
+  { include = "pynanomapper", from = "src" },
 ]
 
 [tool.poetry.dependencies]
