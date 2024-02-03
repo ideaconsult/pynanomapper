@@ -45,6 +45,7 @@ pyyaml = ">=5.1"
 pydantic = "^1"
 requests = "^2.31.0"
 xlsxwriter = "^3.1.9"
+measurement = "^3.2.2"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/ideaconsult/pynanomapper/issues"
