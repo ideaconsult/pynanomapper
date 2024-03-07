@@ -177,8 +177,9 @@ def to_nexus(papp : mx.ProtocolApplication, nx_root: nx.NXroot() = None ) :
                 elif  "material" in prm.lower():
                     target = sample
                 elif ("ASSAY" == prm.upper()) or ("E.METHOD" == prm.upper()):
-                    #target = instrument
-                    continue
+                    print(prm.upper)
+                    target = nx_root[entry_id]["experiment_documentation"]
+                    #continue
                 elif ("E.SOP_REFERENCE" == prm):
                     #target = instrument
                     target = nx_root[entry_id]["experiment_documentation"]
