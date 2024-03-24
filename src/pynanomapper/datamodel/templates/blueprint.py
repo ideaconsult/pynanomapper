@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import json
-
+from datetime import datetime
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -32,26 +32,46 @@ def json2frame(json_data,sortby=None):
 
 def get_method_metadata(json_blueprint):
     _header = {
-    "Project Work Package" : "",
-    "Partner conducting test/assay" : "",
-    "Test facility - Laboratory name" : "",
-    "Lead Scientist & contact for test" : "",
-    "Assay/Test work conducted by" : "",
-    "Full name of test/assay" : json_blueprint.get("EXPERIMENT",""),
+    "Project Work Package" : json_blueprint.get("provenance_workpackage",""),
+    "Partner conducting test/assay" : json_blueprint.get("provenance_workpackage",""),
+    "Test facility - Laboratory name" : json_blueprint.get("provenance_provider",""),
+    "Lead Scientist & contact for test" : json_blueprint.get("provenance_contact",""),
+    "Assay/Test work conducted by" : json_blueprint.get("provenance_operator",""),
+    "Full name of test/assay" : json_blueprint.get("METHOD",""),
     "Short name or acronym for test/assay": json_blueprint.get("METHOD",""),
     "Type or class of experimental test as used here": json_blueprint.get("PROTOCOL_CATEGORY_CODE",""),
     "End-Point being investigated/assessed by the test" : [],
     "Raw data metrics" : [],
-    "SOP(s) for test" : "",
-    "Path/link to sop/protocol": "",
-    "Test start date": None,
-    "Test end date": None
+    "SOP(s) for test" : json_blueprint.get("EXPERIMENT",""),
+    "Path/link to sop/protocol": json_blueprint.get("EXPERIMENT_PROTOCOL",""),
+    "Test start date": json_blueprint.get("provenance_startdate",datetime.now()),
+    "Test end date": json_blueprint.get("provenance_enddate",datetime.now()),
     }
     return _header
 
-def get_materials_df():
-    _header = ["","ERM identifiers","ID","Name","CAS","type","Supplier","Supplier code","Batch","Core","BET surface in m²/g"]
-    return pd.DataFrame(columns=_header)
+def get_materials_metadata(json_blueprint):
+    sample_group_dict = {}
+    for item in json_blueprint.get("METADATA_SAMPLE_INFO"):
+        group = item["param_sample_group"]
+        name = item["param_sample_name"]
+        sample_group_dict.setdefault(group, []).append(name)    
+    _header = {
+    "Select item from Project Materials list" : sample_group_dict.get("ID",["ID"])[0],
+    "Material Name" : sample_group_dict.get("NAME",["NAME"])[0],
+    "Core chemistry" : sample_group_dict.get("CHEMISTRY",["CHEMISTRY"])[0],
+    "CAS No" : sample_group_dict.get("CASRN",["CAS_RN"])[0],
+    "Material Supplier" : sample_group_dict.get("SUPPLIER",["SUPPLIER"])[0],
+    "Material State" : "",
+    "Batch": sample_group_dict.get("BATCH",["BATCH"])[0],
+    "Date of preparation" : datetime.now()
+    }
+    return _header
+
+def get_materials_columns(nanomaterial = True):
+    if nanomaterial:
+        return ["","ERM identifier","ID","Name","CAS","type","Supplier","Supplier code","Batch","Core","BET surface in m²/g"]
+    else:
+        return ["","Material identifier","ID","Name","CAS","type","Supplier","Supplier code","Batch","Core"]
 
 def get_treatment(json_blueprint):
     tmp  = []
@@ -90,21 +110,30 @@ def get_nmparser_config(json_blueprint):
     return config
 
 def get_template_frame(json_blueprint):
-    df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
-    df_sample["type"] = "names"
-    df_sample["position"] = -1
-    df_sample["datamodel"] = "METADATA_SAMPLE_INFO"
-    df_sample = pd.concat([pd.DataFrame([{'param_name': "Test Material Details", 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : 'METADATA_SAMPLE_INFO'}],
+    if "METADATA_SAMPLE_INFO" in json_blueprint:
+        df_sample = pd.DataFrame(list(get_materials_metadata(json_blueprint).items()), columns=['param_name', 'param_value'])
+   
+        #df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
+        df_sample["type"] = "names"
+        df_sample["position"] = -1
+        df_sample["datamodel"] = "METADATA_SAMPLE_INFO"
+        df_sample = pd.concat([pd.DataFrame([{'param_name': "Test Material Details", 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : 'METADATA_SAMPLE_INFO'}],
                                             columns=df_sample.columns), df_sample], ignore_index=True)
+    else:
+        raise Exception("Missing METADATA_SAMPLE_INFO")
 
-
-    df_sample_prep = json2frame(json_blueprint["METADATA_SAMPLE_PREP"],sortby=["param_sampleprep_group"]).rename(columns={'param_sampleprep_name': 'param_name'})
-    result_df_sampleprep = iom_format(df_sample_prep,"param_name","param_sampleprep_group")
-    result_df_sampleprep["datamodel"] = "METADATA_SAMPLE_PREP"
-
-    df_params = json2frame(json_blueprint["METADATA_PARAMETERS"],sortby=["param_group"])
-    result_df = iom_format(df_params)
-    result_df["datamodel"] = "METADATA_PARAMETERS"
+    if "METADATA_SAMPLE_PREP" in json_blueprint:
+        df_sample_prep = json2frame(json_blueprint["METADATA_SAMPLE_PREP"],sortby=["param_sampleprep_group"]).rename(columns={'param_sampleprep_name': 'param_name'})
+        result_df_sampleprep = iom_format(df_sample_prep,"param_name","param_sampleprep_group")
+        result_df_sampleprep["datamodel"] = "METADATA_SAMPLE_PREP"
+    else:
+        raise Exception("Missing METADATA_SAMPLE_PREP")
+    if "METADATA_PARAMETERS" in json_blueprint:
+        df_params = json2frame(json_blueprint["METADATA_PARAMETERS"],sortby=["param_group"])
+        result_df = iom_format(df_params)
+        result_df["datamodel"] = "METADATA_PARAMETERS"
+    else:
+        raise Exception("Missing METADATA_PARAMETERS")
 
     #print(df_sample.columns,result_df.columns)
     #empty_row = pd.DataFrame({col: [""] * len(result_df.columns) for col in result_df.columns})
@@ -164,6 +193,7 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
 
         workbook = writer.book
         worksheet = workbook.add_worksheet(_sheet)
+        info_sheet = worksheet
         worksheet.set_column(1, 1, 20)
         #writer.sheets[_sheet]
         cell_format_def = {
@@ -230,11 +260,25 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
             worksheet = writer.sheets[_sheet]
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
+        materials_sheet = create_materials_sheet(workbook,info_sheet,writer)
 
-        df_material = get_materials_df()
-        df_material.to_excel(writer, sheet_name='Materials', index=False)
-        worksheet = writer.sheets['Materials']
-        # Set column widths to fit the header text
-        for i, col in enumerate(df_material.columns):
-            worksheet.set_column(i, i, len(col) + 1 )
+
+def create_materials_sheet(workbook,info_sheet,writer):
+    materials_sheet = workbook.add_worksheet("Materials")
+    column_headers = get_materials_columns()
+    table = pd.DataFrame(columns=column_headers)
+    table.to_excel(writer, sheet_name="Materials", startrow=0, startcol=0, index=False)
+    erm_identifiers_range = "Materials!$B:$B"  # Entire column B
+    workbook.define_name('ERM_Identifiers', erm_identifiers_range)
+    validation_cell = 'B23'  # cell to apply validation
+    validation = {
+        'validate': 'list',
+        'source': '=ERM_Identifiers'
+    }
+    info_sheet.data_validation(validation_cell, validation)
+    vlookup = [('B24',3),('B25',9),('B26',4),('B27',6),('B29',8)]
+    for v in vlookup:
+        formula = '=VLOOKUP($B$23,Materials!B:J,"{}",FALSE)'.format(v[1])
+        info_sheet.write_formula(v[0], formula)
+    return materials_sheet
 
