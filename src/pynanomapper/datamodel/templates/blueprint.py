@@ -33,6 +33,7 @@ def json2frame(json_data,sortby=None):
         return tmp.sort_values(by=sortby)
 
 def get_method_metadata(json_blueprint):
+
     _header = {
     "Project Work Package" : json_blueprint.get("provenance_workpackage",""),
     "Partner conducting test/assay" : json_blueprint.get("provenance_workpackage",""),
@@ -42,8 +43,10 @@ def get_method_metadata(json_blueprint):
     "Full name of test/assay" : json_blueprint.get("METHOD",""),
     "Short name or acronym for test/assay": json_blueprint.get("METHOD",""),
     "Type or class of experimental test as used here": json_blueprint.get("PROTOCOL_CATEGORY_CODE",""),
-    "End-Point being investigated/assessed by the test" : [],
-    "Raw data metrics" : [],
+    "End-Point being investigated/assessed by the test" :  [item["result_name"] for item in json_blueprint.get("question3",[])],
+    "End-Point units" :  [item["result_unit"] for item in json_blueprint.get("question3",[])],
+    "Raw data metrics" : [item["raw_endpoint"] for item in json_blueprint.get("raw_data_report",[])],
+    "Raw data units" : [item["raw_unit"] for item in json_blueprint.get("raw_data_report",[])],
     "SOP(s) for test" : json_blueprint.get("EXPERIMENT",""),
     "Path/link to sop/protocol": json_blueprint.get("EXPERIMENT_PROTOCOL",""),
     "Test start date": json_blueprint.get("provenance_startdate",datetime.now()),
@@ -113,13 +116,13 @@ def get_nmparser_config(json_blueprint):
 
 def get_template_frame(json_blueprint):
     if "METADATA_SAMPLE_INFO" in json_blueprint:
-        df_sample = pd.DataFrame(list(get_materials_metadata(json_blueprint).items()), columns=['param_name', 'param_value'])
+        df_sample = pd.DataFrame(list(get_materials_metadata(json_blueprint).items()), columns=['param_name', 'value'])
    
         #df_sample = json2frame(json_blueprint["METADATA_SAMPLE_INFO"],sortby=["param_sample_group"]).rename(columns={'param_sample_name': 'param_name'})
         df_sample["type"] = "names"
         df_sample["position"] = -1
         df_sample["datamodel"] = "METADATA_SAMPLE_INFO"
-        df_sample = pd.concat([pd.DataFrame([{'param_name': "Test Material Details", 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : 'METADATA_SAMPLE_INFO'}],
+        df_sample = pd.concat([pd.DataFrame([{'param_name': "Test Material Details", 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : 'METADATA_SAMPLE_INFO', 'value' : ''}],
                                             columns=df_sample.columns), df_sample], ignore_index=True)
     else:
         raise Exception("Missing METADATA_SAMPLE_INFO")
@@ -128,30 +131,37 @@ def get_template_frame(json_blueprint):
         df_sample_prep = json2frame(json_blueprint["METADATA_SAMPLE_PREP"],sortby=["param_sampleprep_group"]).rename(columns={'param_sampleprep_name': 'param_name'})
         result_df_sampleprep = iom_format(df_sample_prep,"param_name","param_sampleprep_group")
         result_df_sampleprep["datamodel"] = "METADATA_SAMPLE_PREP"
+        result_df_sampleprep["value"] = ""
     else:
         raise Exception("Missing METADATA_SAMPLE_PREP")
     if "METADATA_PARAMETERS" in json_blueprint:
         df_params = json2frame(json_blueprint["METADATA_PARAMETERS"],sortby=["param_group"])
         result_df = iom_format(df_params)
         result_df["datamodel"] = "METADATA_PARAMETERS"
+        result_df["value"] = ""
     else:
         raise Exception("Missing METADATA_PARAMETERS")
 
     #print(df_sample.columns,result_df.columns)
     #empty_row = pd.DataFrame({col: [""] * len(result_df.columns) for col in result_df.columns})
+    treatment = get_treatment(json_blueprint)
+    treatment["value"] = ""
 
-    df_method = pd.DataFrame(list(get_method_metadata(json_blueprint).items()), columns=['param_name', 'param_value'])
+    df_method = pd.DataFrame(list(get_method_metadata(json_blueprint).items()), columns=['param_name', 'value'])
     df_method["type"] = "names"
     df_method["position"] = -1
     df_method["datamodel"] = "METHOD"
+    for df in [df_method,df_sample,result_df_sampleprep,result_df,treatment]:
+        if not ("value" in df.columns):
+            print(df.columns)
     df_info =  pd.concat([
-        df_method[["param_name","type","position","datamodel"]],
-        df_sample[["param_name","type","position","datamodel"]],
-        result_df_sampleprep[["param_name","type","position","datamodel"]],
-        result_df[["param_name","type","position","datamodel"]],
-        get_treatment(json_blueprint)[["param_name","type","position","datamodel"]]
+        df_method[["param_name","type","position","datamodel","value"]],
+        df_sample[["param_name","type","position","datamodel","value"]],
+        result_df_sampleprep[["param_name","type","position","datamodel","value"]],
+        result_df[["param_name","type","position","datamodel","value"]],
+        treatment[["param_name","type","position","datamodel","value"]]
         ], ignore_index=True)
-    #print(df_info)
+    print(df_info)
 #:END: Please do not add information below this line
 #Template version	{{ || version }}
 #Template authors	{{ || acknowledgements }}
@@ -160,7 +170,7 @@ def get_template_frame(json_blueprint):
 
     df_info["position"] = range(1, 1 + len(df_info) )
     df_info["position_label"] = 0
-    df_info = pd.concat([df_info,pd.DataFrame([{ "param_name" : "Linked exeriment identifier", "type" : "names", "position" : 1, "position_label" : 5 , "datamodel" : "INVESTIGATION_UUID"}])])
+    df_info = pd.concat([df_info,pd.DataFrame([{ "param_name" : "Linked exeriment identifier", "type" : "names", "position" : 1, "position_label" : 5 , "datamodel" : "INVESTIGATION_UUID","value" : ""}])])
     df_conditions  = pd.DataFrame(json_blueprint["conditions"])
     df_result = pd.DataFrame(json_blueprint["question3"]) if 'question3' in json_blueprint else None
     df_raw =  pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
@@ -217,7 +227,6 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
  
         workbook = writer.book
         worksheet = workbook.add_worksheet(_sheet)
-        info_sheet = worksheet
         worksheet.set_column(1, 1, 20)
         #writer.sheets[_sheet]
         cell_format_def = {
@@ -243,7 +252,12 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
             cf = cell_format[row["type"]]
             cf_labels = cell_format["{}_labels".format(row["type"])]
             worksheet.write(startrow+row['position']-1,row['position_label'],row['param_name'],cf_labels)
-            worksheet.write(startrow+row['position']-1,row['position_label']+1,row['position'],cf)
+            if isinstance(row["value"], datetime):
+                vals = [row["value"].strftime("%Y-%m-%d")]
+            else:
+                vals = row["value"] if isinstance(row["value"], list) else [str(row["value"])]
+            for index, value in enumerate(vals):
+                worksheet.write(startrow+row['position']-1,row['position_label']+index+1,value,cf)
             if row["type"] == "group":
                 worksheet.set_row(startrow+row['position']-1, None, cf_labels)
             else:
@@ -301,15 +315,15 @@ def create_materials_sheet(workbook,writer,materials,info,results):
     table.to_excel(writer, sheet_name=materials, startrow=0, startcol=0, index=False)
     erm_identifiers_range = "{}!$B:$B".format(materials)  # Entire column B
     workbook.define_name('ERM_Identifiers', erm_identifiers_range)
-    validation_cell = 'B23'  # cell to apply validation
+    validation_cell = 'B25'  # cell to apply validation
     validation = {
         'validate': 'list',
         'source': '=ERM_Identifiers'
     }
     info_sheet.data_validation(validation_cell, validation)
-    vlookup = [('B24',3),('B25',9),('B26',4),('B27',6),('B29',8)]
+    vlookup = [('B26',3),('B27',9),('B28',4),('B29',6),('B31',8)]
     for v in vlookup:
-        formula = '=VLOOKUP($B$23,Materials!B:J,"{}",FALSE)'.format(v[1])
+        formula = '=VLOOKUP($B$25,Materials!B:J,"{}",FALSE)'.format(v[1])
         info_sheet.write_formula(v[0], formula)
     for result in results:
         try:
