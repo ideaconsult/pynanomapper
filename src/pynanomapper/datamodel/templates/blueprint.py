@@ -3,6 +3,7 @@ import os
 import json
 from datetime import datetime
 from xlsxwriter.utility import xl_col_to_name
+import openpyxl 
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -160,23 +161,44 @@ def get_template_frame(json_blueprint):
     df_info["position"] = range(1, 1 + len(df_info) )
     df_info["position_label"] = 0
     df_info = pd.concat([df_info,pd.DataFrame([{ "param_name" : "Linked exeriment identifier", "type" : "names", "position" : 1, "position_label" : 5 , "datamodel" : "INVESTIGATION_UUID"}])])
-
+    df_conditions  = pd.DataFrame(json_blueprint["conditions"])
     df_result = pd.DataFrame(json_blueprint["question3"]) if 'question3' in json_blueprint else None
     df_raw =  pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
-    return df_info,df_result,df_raw
+    return df_info,df_result,df_raw,df_conditions
 
-def results_table(df_result,result_name='result_name',results_conditions='results_conditions'):
-    print(df_result)
-    unique_result_names = df_result[result_name].unique()
-    new_header = list(["Material"])
+def get_unit_by_condition_name(json_blueprint,name):
+    for condition in json_blueprint['conditions']:
+        if condition['condition_name'] == name:
+            return condition.get('condition_unit', None)
+    return None
+
+def results_table(df_result,df_conditions = None,
+                    result_name='result_name',
+                  result_unit = 'result_unit',
+                  results_conditions='results_conditions'):
+
+    result_names = df_result[result_name]
+    result_unit = df_result[result_unit]
+
+    header1 = list(["Material"])
+    header2 = list([""])
     if results_conditions in df_result.columns:
         unique_conditions = set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions)
-        new_header = new_header + list(unique_conditions)
-    new_header = new_header + list(unique_result_names)
-    return pd.DataFrame(columns=new_header)
+        header1 = header1 + list(unique_conditions)
+        for c in list(unique_conditions):
+            try:
+                unit = df_conditions.loc[df_conditions['conditon_name'] == c, 'condition_unit'].iloc[0]
+                header2 = header2 + [unit if not pd.isnull(unit) else ""]
+            except:
+                header2 = header2 + [""]
+
+    header1 = header1 + list(result_names)
+    header2 = header2 + list(result_unit)
+    return  pd.DataFrame([header2],columns=header1)
 
 
-def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
+
+def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=None):
     _SHEET_INFO =  "Test_conditions"
     _SHEET_RAW = "Raw_data_TABLE" 
     _SHEET_RESULT = "Results_TABLE"
@@ -247,22 +269,26 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
             pass
         else:
             _sheet = _SHEET_RAW
-            new_df = results_table(df_raw,result_name='raw_endpoint',results_conditions='raw_conditions')
-            new_df.to_excel(writer, sheet_name=_sheet, index=False)
+            new_df = results_table(df_raw,df_conditions,
+                                    result_name='raw_endpoint',
+                                    result_unit = 'raw_unit',
+                                    results_conditions='raw_conditions')
+            new_df.to_excel(writer, sheet_name=_sheet, index=False, freeze_panes=(2, 0))
             worksheet = writer.sheets[_sheet]
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
+            #worksheet.add_table(3, 1, 1048576, len(new_df.columns), {'header_row': True, 'name': _SHEET_RAW})
 
         if df_result is None:
             pass
         else:
             _sheet = _SHEET_RESULT 
             new_df = results_table(df_result,result_name='result_name',results_conditions='results_conditions')
-            new_df.to_excel(writer, sheet_name=_sheet, index=False)
+            new_df.to_excel(writer, sheet_name=_sheet, index=False, freeze_panes=(2, 0))
             worksheet = writer.sheets[_sheet]
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
-        materials_sheet = create_materials_sheet(workbook,writer,
+            materials_sheet = create_materials_sheet(workbook,writer,
                                     materials=_SHEET_MATERIAL,
                                     info=_SHEET_INFO,results=[_SHEET_RAW,_SHEET_RESULT])
 
@@ -286,7 +312,19 @@ def create_materials_sheet(workbook,writer,materials,info,results):
         formula = '=VLOOKUP($B$23,Materials!B:J,"{}",FALSE)'.format(v[1])
         info_sheet.write_formula(v[0], formula)
     for result in results:
-        result_sheet = writer.sheets[result]        
-        result_sheet.data_validation("A2:A1048576", validation)
+        try:
+            result_sheet = writer.sheets[result]        
+            result_sheet.data_validation("A3:A1048576", validation)
+        except:
+            pass
     return materials_sheet
 
+def protect_headers(worksheet,ncols):
+    for row in range(3):  # Rows are 0-indexed, so we loop from 0 to 2 (inclusive)
+        for col in range(ncols):  # Iterate over all columns
+            cell = worksheet.cell(row=row, column=col)
+            cell.protection = openpyxl.worksheet.protection.CellProtection(locked=True)
+                # Protect the worksheet
+    worksheet.protection.sheet = True
+    worksheet.protection.autoFilter = True
+    worksheet.protection.enable()    

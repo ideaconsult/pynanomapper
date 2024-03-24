@@ -54,7 +54,17 @@
             "result_name": "Cell viability",
             "result_unit": "%",
             "result_type": "value_num"
-        }
+        },
+        {
+            "results_conditions": [
+                "concentration",
+                "time",
+                "Experiment"
+            ],
+            "result_name": "Fold change",
+            "result_unit": "",
+            "result_type": "value_num"
+        }        
     ],
     "METADATA_PARAMETERS": [
         {
