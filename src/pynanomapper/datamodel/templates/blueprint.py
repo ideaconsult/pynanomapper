@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import json
 from datetime import datetime
+from xlsxwriter.utility import xl_col_to_name
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -176,6 +177,10 @@ def results_table(df_result,result_name='result_name',results_conditions='result
 
 
 def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
+    _SHEET_INFO =  "Test_conditions"
+    _SHEET_RAW = "Raw_data_TABLE" 
+    _SHEET_RESULT = "Results_TABLE"
+    _SHEET_MATERIAL = "Materials"
     _guide = [
     "Please complete all applicable fields below as far as possible. Aim to familiarise yourself with the Introductory Guidance and Example Filled Templates.",
     "While aiming to standardise data recording as far as we can, flexibility may still be needed for some Test/Assay types and their results:",
@@ -186,11 +191,8 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
     with pd.ExcelWriter(file_path, engine='xlsxwriter', mode='w') as writer:
 
         startrow = 7
-        _sheet = "Test_conditions"
-        print("df_info",df_info.columns)
-
-        #df_info[["param_name","position"]].to_excel(writer, sheet_name=_sheet, index=False, startrow=startrow, startcol = 0, header=False)
-
+        _sheet = _SHEET_INFO
+ 
         workbook = writer.book
         worksheet = workbook.add_worksheet(_sheet)
         info_sheet = worksheet
@@ -244,7 +246,7 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
         if df_raw is None:
             pass
         else:
-            _sheet = "Raw_data_TABLE"
+            _sheet = _SHEET_RAW
             new_df = results_table(df_raw,result_name='raw_endpoint',results_conditions='raw_conditions')
             new_df.to_excel(writer, sheet_name=_sheet, index=False)
             worksheet = writer.sheets[_sheet]
@@ -254,21 +256,24 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None):
         if df_result is None:
             pass
         else:
-            _sheet = "Results_TABLE"
+            _sheet = _SHEET_RESULT 
             new_df = results_table(df_result,result_name='result_name',results_conditions='results_conditions')
             new_df.to_excel(writer, sheet_name=_sheet, index=False)
             worksheet = writer.sheets[_sheet]
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
-        materials_sheet = create_materials_sheet(workbook,info_sheet,writer)
+        materials_sheet = create_materials_sheet(workbook,writer,
+                                    materials=_SHEET_MATERIAL,
+                                    info=_SHEET_INFO,results=[_SHEET_RAW,_SHEET_RESULT])
 
 
-def create_materials_sheet(workbook,info_sheet,writer):
-    materials_sheet = workbook.add_worksheet("Materials")
+def create_materials_sheet(workbook,writer,materials,info,results):
+    info_sheet = writer.sheets[info]
+    materials_sheet = workbook.add_worksheet(materials)
     column_headers = get_materials_columns()
     table = pd.DataFrame(columns=column_headers)
-    table.to_excel(writer, sheet_name="Materials", startrow=0, startcol=0, index=False)
-    erm_identifiers_range = "Materials!$B:$B"  # Entire column B
+    table.to_excel(writer, sheet_name=materials, startrow=0, startcol=0, index=False)
+    erm_identifiers_range = "{}!$B:$B".format(materials)  # Entire column B
     workbook.define_name('ERM_Identifiers', erm_identifiers_range)
     validation_cell = 'B23'  # cell to apply validation
     validation = {
@@ -280,5 +285,8 @@ def create_materials_sheet(workbook,info_sheet,writer):
     for v in vlookup:
         formula = '=VLOOKUP($B$23,Materials!B:J,"{}",FALSE)'.format(v[1])
         info_sheet.write_formula(v[0], formula)
+    for result in results:
+        result_sheet = writer.sheets[result]        
+        result_sheet.data_validation("A2:A1048576", validation)
     return materials_sheet
 
