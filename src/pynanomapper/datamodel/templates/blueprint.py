@@ -86,7 +86,7 @@ def get_treatment(json_blueprint):
         isreplicate = item["condition_type"].startswith("c_replicate")
         isconcentration = item["condition_type"].startswith("c_concentration")
         if not isreplicate:
-            tmp.append({'param_name': "TREATMENT {}".format(item[name].upper()), 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : ""})
+            tmp.append({'param_name': "TREATMENT {}".format(item[name].upper()), 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" :  ""})
         else:
             if condition_type != isreplicate:
                 tmp.append({'param_name': "CONTROLS", 'type': 'group', 'position' : '0', 'position_label' : 0,'datamodel' : "c_replicate", "value" : ""})
@@ -98,10 +98,10 @@ def get_treatment(json_blueprint):
         if "condition_unit" in item:
             tmp.append({'param_name': "{} series unit".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : item["condition_unit"]})
         if not isreplicate:
-            tmp.append({'param_name': "{} series labels".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : item["condition_type"]})
-        tmp.append({'param_name': "{}".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : [item['condition_type']]})
+            tmp.append({'param_name': "{} series labels".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : [f"C{i}" for i in range(1, 20 + 1)]})
+        tmp.append({'param_name': "{}".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" :  [f"C{i}" for i in range(1, 20 + 1)]})
         if isconcentration:
-            tmp.append({'param_name': "Treatment type series", 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : "c_treatment", "value" : []})
+            tmp.append({'param_name': "Treatment type series", 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : "c_treatment", "value" : ""})
         condition_type = isreplicate
     return pd.DataFrame(tmp)
 
@@ -266,8 +266,6 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
                     print(row['param_name'],row["datamodel"])
                     pass
 
-        worksheet.set_row(0, None, cell_format["top1"])
-
         for row in range(1, startrow-2):
             worksheet.set_row(row, None, cell_format["top7"])
             worksheet.write(row, 0, _guide[row-1])
@@ -278,6 +276,10 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
         worksheet.write("B1","Test Data Recording Form (TDRF)")
         worksheet.write("A6","TEST CONDITIONS")
         worksheet.write("B6","Please ensure you also complete a Test Method Description Form (TMDF) for this test type")
+
+        #conc_range = "{}!$B$72:$G$72".format(_SHEET_INFO)  # Entire column B
+        #workbook.define_name('CONCENTRATIONS', conc_range)
+
         if df_raw is None:
             pass
         else:
@@ -288,8 +290,15 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
                                     results_conditions='raw_conditions')
             new_df.to_excel(writer, sheet_name=_sheet, index=False, freeze_panes=(2, 0))
             worksheet = writer.sheets[_sheet]
+            print(new_df.columns)
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
+                if col=="concentration":
+                    colname = xl_col_to_name(i)
+                    #worksheet.data_validation('{}3:{}1048576'.format(colname,colname), 
+                    #                          {'validate': 'list',
+                    #                      'source': '=CONCENTRATIONS'})
+    
             #worksheet.add_table(3, 1, 1048576, len(new_df.columns), {'header_row': True, 'name': _SHEET_RAW})
 
         if df_result is None:
@@ -324,20 +333,19 @@ def create_materials_sheet(workbook,writer,materials,info,results):
     for v in vlookup:
         formula = '=VLOOKUP($B$25,Materials!B:J,"{}",FALSE)'.format(v[1])
         info_sheet.write_formula(v[0], formula)
+    readonly_format = workbook.add_format({'locked': True})
+    
     for result in results:
         try:
             result_sheet = writer.sheets[result]        
             result_sheet.data_validation("A3:A1048576", validation)
+            #protect_headers(result_sheet,readonly_format)
         except:
             pass
     return materials_sheet
 
-def protect_headers(worksheet,ncols):
-    for row in range(3):  # Rows are 0-indexed, so we loop from 0 to 2 (inclusive)
-        for col in range(ncols):  # Iterate over all columns
-            cell = worksheet.cell(row=row, column=col)
-            cell.protection = openpyxl.worksheet.protection.CellProtection(locked=True)
-                # Protect the worksheet
-    worksheet.protection.sheet = True
-    worksheet.protection.autoFilter = True
-    worksheet.protection.enable()    
+def protect_headers(worksheet,readonly_format):
+    worksheet.set_default_row(options={'locked': False})
+    worksheet.set_row(0, None, readonly_format)
+    worksheet.set_row(1, None, readonly_format)
+    worksheet.protect()
