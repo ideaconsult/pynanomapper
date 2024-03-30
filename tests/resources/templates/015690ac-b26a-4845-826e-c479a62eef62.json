@@ -1,0 +1,87 @@
+{
+    "conditions": [
+        {
+            "conditon_name": "Concentration",
+            "condition_unit": "CFU/ml",
+            "condition_type": "c_concentration"
+        },
+        {
+            "conditon_name": "Time",
+            "condition_unit": "day",
+            "condition_type": "c_time"
+        },
+        {
+            "conditon_name": "Experiment",
+            "condition_type": "c_replicate_tech"
+        },
+        {
+            "conditon_name": "Replicate",
+            "condition_type": "c_replicate_bio"
+        }
+    ],
+    "PROTOCOL_TOP_CATEGORY": "ECOTOX",
+    "raw_data": false,
+    "template_status": "DRAFT",
+    "template_name": "Pseudomonas experiment new version Pseudomonas experiment",
+    "template_author": "M M",
+    "template_acknowledgment": "MOMENTUM MOMENTUM",
+    "user_role": [
+        "role_lab"
+    ],
+    "METHOD": "Long term bacterial culture ",
+    "EXPERIMENT": "Bacterial cell viability ",
+    "question3": [
+        {
+            "results_conditions": [
+                "Concentration",
+                "Time",
+                "Experiment",
+                "Replicate"
+            ],
+            "result_name": "Log concentration",
+            "result_aggregate": "MEAN",
+            "result_endpoint_uncertainty": "SD",
+            "result_type": "value_num"
+        }
+    ],
+    "PROTOCOL_CATEGORY_CODE": "EC_BACTOX_SECTION",
+    "RESULTS": "concentration of viable bacterium",
+    "METADATA_PARAMETERS": [
+        {
+            "param_name": "medium",
+            "param_group": "MEDIUM",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "species",
+            "param_group": "OTHER_METADATA",
+            "param_type": "value_text"
+        }
+    ],
+    "METADATA_SAMPLE_INFO": [
+        {
+            "param_sample_name": "material id",
+            "param_sample_group": "ID"
+        }
+    ],
+    "METADATA_SAMPLE_PREP-Comment": "for particle as well as bacteria  (starting concentration)",
+    "METADATA_SAMPLE_PREP": [
+        {
+            "param_sampleprep_name": "sample prep",
+            "param_sampleprep_group": "OTHER_METADATA"
+        }
+    ],
+    "origin_uuid": "d919bbde-cb34-464e-9f75-ec3ac8602a30",
+    "SOP": "protocol_research",
+    "EXPERIMENT_PROTOCOL": "tbd",
+    "data_sheets": [
+        "data_raw"
+    ],
+    "raw_data_report": [
+        {
+            "raw_endpoint": "test",
+            "raw_aggregate": "RAW_DATA",
+            "raw_type": "value_num"
+        }
+    ]
+}

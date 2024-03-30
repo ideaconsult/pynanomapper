@@ -46,7 +46,7 @@ def get_method_metadata(json_blueprint):
     "End-Point being investigated/assessed by the test" :  [item["result_name"] if "result_name" in item else "result_name_not_specified" for item in json_blueprint.get("question3",[])],
     "End-Point units" :  [item["result_unit"] if "result_unit" in item else "" for item in json_blueprint.get("question3",[])],
     "Raw data metrics" : [item["raw_endpoint"] if "raw_endpoint" in item else "raw_endpoint_not_specified" for item in json_blueprint.get("raw_data_report",[])],
-    "Raw data units" : [item["raw_unit"] if "raw_unit" in item else "" for item in json_blueprint.get("raw_data_report",[])],
+    "Raw data units" : [item.get("raw_unit","") for item in json_blueprint.get("raw_data_report",[])],
     "SOP(s) for test" : json_blueprint.get("EXPERIMENT",""),
     "Path/link to sop/protocol": json_blueprint.get("EXPERIMENT_PROTOCOL",""),
     "Test start date": json_blueprint.get("provenance_startdate",datetime.now()),
@@ -171,6 +171,8 @@ def get_template_frame(json_blueprint):
     df_info["position_label"] = 0
     df_info = pd.concat([df_info,pd.DataFrame([{ "param_name" : "Linked exeriment identifier", "type" : "names", "position" : 1, "position_label" : 5 , "datamodel" : "INVESTIGATION_UUID","value" : ""}])])
     df_conditions  = pd.DataFrame(json_blueprint["conditions"])
+    if not "data_sheets" in json_blueprint:
+       json_blueprint["data_sheets"] = ["data_processed"]
     if "data_processed" in json_blueprint["data_sheets"]:    
         df_result = pd.DataFrame(json_blueprint["question3"]) if 'question3' in json_blueprint else None
     else:
@@ -193,7 +195,11 @@ def results_table(df_result,df_conditions = None,
                   results_conditions='results_conditions'):
 
     result_names = df_result[result_name]
-    result_unit = df_result[result_unit]
+    try:
+        result_unit = df_result[result_unit]
+    except Exception as err:
+        print(err)
+        result_unit = None
 
     header1 = list(["Material"])
     header2 = list([""])
@@ -208,8 +214,11 @@ def results_table(df_result,df_conditions = None,
                 header2 = header2 + [""]
 
     header1 = header1 + list(result_names)
-    header2 = header2 + list(result_unit)
-    return  pd.DataFrame([header2],columns=header1)
+    if not result_unit is None:
+        header2 = header2 + list(result_unit)
+        return  pd.DataFrame([header2],columns=header1)
+    else:
+        return  pd.DataFrame(columns=header1)    
 
 
 
@@ -269,7 +278,7 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
                 try:
                     worksheet.write_comment(startrow+row['position']-1,row['position_label']+1, row["datamodel"])
                 except:
-                    print(row['param_name'],row["datamodel"])
+                    #print(row['param_name'],row["datamodel"])
                     pass
 
         for row in range(1, startrow-2):
@@ -297,7 +306,7 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
                                     results_conditions='raw_conditions')
             new_df.to_excel(writer, sheet_name=_sheet, index=False, freeze_panes=(2, 0))
             worksheet = writer.sheets[_sheet]
-            print(new_df.columns)
+            #print(new_df.columns)
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
                 if col=="concentration":
