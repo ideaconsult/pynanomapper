@@ -81,7 +81,7 @@ def get_materials_columns(nanomaterial = True):
 def get_treatment(json_blueprint):
     tmp  = []
     condition_type = None
-    for item in json_blueprint["conditions"]:
+    for item in json_blueprint.get("conditions",[]):
         name = "conditon_name"
         isreplicate = item["condition_type"].startswith("c_replicate")
         isconcentration = item["condition_type"].startswith("c_concentration")
