@@ -28,9 +28,21 @@ def test_doseresponse_rawonly_template():
         assert(Path(_path).exists())
         xls = pd.ExcelFile(_path)
         assert "Raw_data_TABLE" in xls.sheet_names
+        assert not "Results_TABLE" in xls.sheet_names  
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
 
+def test_doseresponse_resultsonly_template():
+    with open(TEST_JSON_PATH, "r") as file:
+        json_blueprint = json.load(file)
+        json_blueprint["data_sheets"] = ["data_processed"]
+        _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
+        assert(Path(_path).exists())
+        xls = pd.ExcelFile(_path)
+        assert not "Raw_data_TABLE" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names        
+        assert "Test_conditions" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
 
 def test_doseresponse_nmparser():
     with open(TEST_JSON_PATH, "r") as file:
