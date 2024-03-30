@@ -29,7 +29,9 @@
         }
     ],
     "PROTOCOL_CATEGORY_CODE": "ENM_0000068_SECTION",
-    "raw_data": true,
+    "data_sheets": [
+        "data_raw","data_processed"
+    ],
     "RESULTS": "raw data ( absorbance) \ncell viability  (%)",
     "raw_data_report": [
         {

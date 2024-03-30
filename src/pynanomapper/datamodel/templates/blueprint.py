@@ -171,8 +171,14 @@ def get_template_frame(json_blueprint):
     df_info["position_label"] = 0
     df_info = pd.concat([df_info,pd.DataFrame([{ "param_name" : "Linked exeriment identifier", "type" : "names", "position" : 1, "position_label" : 5 , "datamodel" : "INVESTIGATION_UUID","value" : ""}])])
     df_conditions  = pd.DataFrame(json_blueprint["conditions"])
-    df_result = pd.DataFrame(json_blueprint["question3"]) if 'question3' in json_blueprint else None
-    df_raw =  pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
+    if "data_processed" in json_blueprint["data_sheets"]:    
+        df_result = pd.DataFrame(json_blueprint["question3"]) if 'question3' in json_blueprint else None
+    else:
+        df_result = None
+    if "data_raw" in json_blueprint["data_sheets"]:
+        df_raw =  pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
+    else:
+        df_raw = None
     return df_info,df_result,df_raw,df_conditions
 
 def get_unit_by_condition_name(json_blueprint,name):
@@ -279,11 +285,12 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
 
         #conc_range = "{}!$B$72:$G$72".format(_SHEET_INFO)  # Entire column B
         #workbook.define_name('CONCENTRATIONS', conc_range)
-
+        linksheets = []
         if df_raw is None:
             pass
         else:
             _sheet = _SHEET_RAW
+            linksheets = [_sheet]
             new_df = results_table(df_raw,df_conditions,
                                     result_name='raw_endpoint',
                                     result_unit = 'raw_unit',
@@ -310,9 +317,11 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
             worksheet = writer.sheets[_sheet]
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
-            materials_sheet = create_materials_sheet(workbook,writer,
+            linksheets.append(_sheet)
+
+        materials_sheet = create_materials_sheet(workbook,writer,
                                     materials=_SHEET_MATERIAL,
-                                    info=_SHEET_INFO,results=[_SHEET_RAW,_SHEET_RESULT])
+                                    info=_SHEET_INFO,results=linksheets)
 
 
 def create_materials_sheet(workbook,writer,materials,info,results):
