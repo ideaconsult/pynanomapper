@@ -117,6 +117,21 @@ def get_nmparser_config(json_blueprint):
         config = json.load(json_file)
     return config
 
+def add_plate_layout(file_path_xlsx,json_blueprint):
+    print(json_blueprint.get("data_sheets"))
+    if "data_platelayout" in json_blueprint.get("data_sheets",[]):
+        platexlsx = "platelayout_{}well.xlsx".format(json_blueprint.get("data_platelayout",96) )
+        current_script_directory = os.path.dirname(os.path.abspath(__file__))
+        resource_file = os.path.join(current_script_directory, "../../resource/nmparser",platexlsx)
+        # Open the existing Excel file for appending
+        with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
+            # Load sheets from the second Excel file
+            with pd.ExcelFile(resource_file) as another_xls:
+                for sheet_name in another_xls.sheet_names:
+                    df = pd.read_excel(resource_file, sheet_name=sheet_name)
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)       
+
+
 def get_template_frame(json_blueprint):
     if "METADATA_SAMPLE_INFO" in json_blueprint:
         df_sample = pd.DataFrame(list(get_materials_metadata(json_blueprint).items()), columns=['param_name', 'value'])
