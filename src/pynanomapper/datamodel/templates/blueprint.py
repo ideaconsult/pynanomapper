@@ -5,6 +5,7 @@ from datetime import datetime
 from xlsxwriter.utility import xl_col_to_name
 import shutil
 from openpyxl.utils import get_column_letter
+from openpyxl.styles import PatternFill
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -120,7 +121,11 @@ def get_nmparser_config(json_blueprint):
 
 def create_nested_headers_dataframe(dicts, 
                 keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}},
-                levels = ['group','name','unit'],lookup = {}):
+                levels = ['group','name','unit'],
+                lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation",
+                          "OTHER_SAMPLEPREP" : "",
+                          "raw_data_report" : "Raw data","question3" : "Results"}
+                ):
     # Initialize an empty DataFrame
     df = pd.DataFrame()
     # Iterate through the dictionaries
@@ -130,7 +135,8 @@ def create_nested_headers_dataframe(dicts,
             try:
                 tags = [lookup.get(key,key)]
                 for level in levels:
-                    tags.append(param.get(keys[key][level], "") )
+                    _tmp = param.get(keys[key][level],"")
+                    tags.append(lookup.get(_tmp,_tmp) )
                 #print(tags)
                 df[tuple(tags)] = None
             except Exception as err:
@@ -142,7 +148,7 @@ def create_nested_headers_dataframe(dicts,
     df.columns = pd.MultiIndex.from_tuples(df.columns, names=names)
     return df
 
-def autofit_columns(sheet):
+def autofit_columns(sheet,cols=None):
     # Autofit column widths
     for column in sheet.columns:
         max_length = 0
@@ -155,23 +161,26 @@ def autofit_columns(sheet):
                 pass
         adjusted_width = (max_length + 2) * 1.2  # Adjust for padding and scaling
         sheet.column_dimensions[column_letter].width = adjusted_width    
+        # Apply colors to top-level keys
+    top_level_colors = {'METADATA_PARAMETERS': 'BDD7EE', 
+                        'Sample': 'FCE4D6','Sample preparation' : 'BDD7EE',
+                         'Raw data' : 'FCE4D6', 'Results' : 'BDD7EE' }
+
+    for col_num, value in enumerate(cols):
+        #print(cols.levels)
+        top_level = value[0]
+        if top_level in top_level_colors:
+            clr = top_level_colors.get(top_level,"white")
+            pf = PatternFill(start_color=clr, end_color=clr, fill_type="solid")
+            sheet.cell(row=1, column=col_num+1).fill = pf
+        #break
+        
 
 def pchem_format_2excel(file_path_xlsx,json_blueprint):
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
     shutil.copy2(resource_file, file_path_xlsx)
     with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
-        df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        df.to_excel(writer,sheet_name="Measuring_conditions")
-        autofit_columns(writer.book["Measuring_conditions"])
-
-        df = create_nested_headers_dataframe(json_blueprint,keys=
-                {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
-                "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
-                levels = ['group','name'])
-        df.to_excel(writer,sheet_name="SAMPLES")     
-        autofit_columns(writer.book["SAMPLES"])
-
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"raw_data_report" : {'name' : 'raw_endpoint', 'unit' : 'raw_unit'},
                 "question3" : {'name' : 'result_name', 'unit' : 'result_unit'}},
@@ -179,7 +188,19 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
                 lookup = {"raw_data_report" : "Raw data","question3" : "Results"}
                 )
         df.to_excel(writer,sheet_name="Results_TABLE") 
-        autofit_columns(writer.book["Results_TABLE"])
+        autofit_columns(writer.book["Results_TABLE"],df.columns)
+
+        df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
+        df.to_excel(writer,sheet_name="Measuring_conditions")
+        autofit_columns(writer.book["Measuring_conditions"],df.columns)
+
+        df = create_nested_headers_dataframe(json_blueprint,keys=
+                {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
+                "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
+                levels = ['group','name'], lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation"})
+        df.to_excel(writer,sheet_name="SAMPLES")     
+        autofit_columns(writer.book["SAMPLES"],df.columns)
+
 
 
 def add_plate_layout(file_path_xlsx,json_blueprint):
