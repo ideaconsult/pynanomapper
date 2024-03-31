@@ -3,7 +3,7 @@ import os
 import json
 from datetime import datetime
 from xlsxwriter.utility import xl_col_to_name
-import openpyxl 
+import shutil
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -116,6 +116,11 @@ def get_nmparser_config(json_blueprint):
         # Load the JSON data from the file
         config = json.load(json_file)
     return config
+
+def pchem_format_2excel(file_path,json_blueprint):
+    current_script_directory = os.path.dirname(os.path.abspath(__file__))
+    resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
+    shutil.copy2(resource_file, file_path)
 
 def add_plate_layout(file_path_xlsx,json_blueprint):
     print(json_blueprint.get("data_sheets"))
@@ -238,7 +243,6 @@ def results_table(df_result,df_conditions = None,
         return  pd.DataFrame([header2],columns=header1)
     else:
         return  pd.DataFrame(columns=header1)    
-
 
 
 def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=None):

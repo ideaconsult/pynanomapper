@@ -63,6 +63,20 @@ def test_doseresponse_resultsonly_template():
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
 
+def test_pchem_template():
+    with open(TEST_JSON_PATH, "r") as file:
+        json_blueprint = json.load(file)
+        json_blueprint["template_layout"] = ["pchem"]
+        json_blueprint["data_sheets"] = ["data_processed"]
+        _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
+        assert(Path(_path).exists())
+        xls = pd.ExcelFile(_path)
+        #assert not "Raw_data_TABLE" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names        
+        assert "Provider_informations" in xls.sheet_names
+        assert "Measuring_conditions" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+
 def test_doseresponse_nmparser():
     with open(TEST_JSON_PATH, "r") as file:
         json_blueprint = json.load(file)
@@ -72,9 +86,13 @@ def test_doseresponse_nmparser():
 def get_template_xlsx(uuid,json_blueprint):
     try:
         file_path_xlsx = os.path.join(TEMPLATE_DIR, f"{uuid}.xlsx")   
-        df_info,df_result,df_raw, df_conditions =bp.get_template_frame(json_blueprint)
-        bp.iom_format_2excel(file_path_xlsx,df_info,df_result,df_raw,df_conditions)
-        bp.add_plate_layout(file_path_xlsx,json_blueprint)
+        layout = json_blueprint.get("template_layout","dose_response")
+        if layout == "dose_response": 
+            df_info,df_result,df_raw, df_conditions =bp.get_template_frame(json_blueprint)
+            bp.iom_format_2excel(file_path_xlsx,df_info,df_result,df_raw,df_conditions)
+            bp.add_plate_layout(file_path_xlsx,json_blueprint)
+        else:
+            bp.pchem_format_2excel(file_path_xlsx,json_blueprint)
         return file_path_xlsx  
     except Exception as err:
         raise err
