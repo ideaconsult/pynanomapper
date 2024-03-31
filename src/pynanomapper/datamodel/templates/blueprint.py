@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from xlsxwriter.utility import xl_col_to_name
 import shutil
+from openpyxl.utils import get_column_letter
 
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -141,6 +142,20 @@ def create_nested_headers_dataframe(dicts,
     df.columns = pd.MultiIndex.from_tuples(df.columns, names=names)
     return df
 
+def autofit_columns(sheet):
+    # Autofit column widths
+    for column in sheet.columns:
+        max_length = 0
+        column_letter = get_column_letter(column[0].column)
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = (max_length + 2) * 1.2  # Adjust for padding and scaling
+        sheet.column_dimensions[column_letter].width = adjusted_width    
+
 def pchem_format_2excel(file_path_xlsx,json_blueprint):
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
@@ -148,11 +163,15 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
     with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
         df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
         df.to_excel(writer,sheet_name="Measuring_conditions")
+        autofit_columns(writer.book["Measuring_conditions"])
+
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
                 "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
                 levels = ['group','name'])
-        df.to_excel(writer,sheet_name="SAMPLES")        
+        df.to_excel(writer,sheet_name="SAMPLES")     
+        autofit_columns(writer.book["SAMPLES"])
+
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"raw_data_report" : {'name' : 'raw_endpoint', 'unit' : 'raw_unit'},
                 "question3" : {'name' : 'result_name', 'unit' : 'result_unit'}},
@@ -160,6 +179,7 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
                 lookup = {"raw_data_report" : "Raw data","question3" : "Results"}
                 )
         df.to_excel(writer,sheet_name="Results_TABLE") 
+        autofit_columns(writer.book["Results_TABLE"])
 
 
 def add_plate_layout(file_path_xlsx,json_blueprint):
