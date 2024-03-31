@@ -79,6 +79,7 @@ def get_materials_columns(nanomaterial = True):
         return ["","Material identifier","ID","Name","CAS","type","Supplier","Supplier code","Batch","Core"]
 
 def get_treatment(json_blueprint):
+    _maxfields = 15
     tmp  = []
     condition_type = None
     for item in json_blueprint.get("conditions",[]):
@@ -98,8 +99,10 @@ def get_treatment(json_blueprint):
         if "condition_unit" in item:
             tmp.append({'param_name': "{} series unit".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : item["condition_unit"]})
         if not isreplicate:
-            tmp.append({'param_name': "{} series labels".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : [f"C{i}" for i in range(1, 20 + 1)]})
-        tmp.append({'param_name': "{}".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" :  [f"C{i}" for i in range(1, 20 + 1)]})
+            tag =item['condition_type'].split('_')[1][0].upper()
+            _start = 0 if isconcentration else 1
+            tmp.append({'param_name': "{} series labels".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : [f"{tag}{i}" if i <= 3 else "" for i in range(1, _maxfields + 1)]})
+        tmp.append({'param_name': "{}".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" :  [i if i<=(2+_start) else "" for i in range(_start, _maxfields + _start + 1)]})
         if isconcentration:
             tmp.append({'param_name': "Treatment type series", 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : "c_treatment", "value" : ""})
         condition_type = isreplicate
@@ -181,6 +184,7 @@ def get_template_frame(json_blueprint):
         df_raw =  pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
     else:
         df_raw = None
+    
     return df_info,df_result,df_raw,df_conditions
 
 def get_unit_by_condition_name(json_blueprint,name):
