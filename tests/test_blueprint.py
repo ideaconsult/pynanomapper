@@ -7,6 +7,7 @@ import pandas as pd
 
 TEMPLATE_DIR = Path(__file__).parent / "resources/templates"
 TEST_JSON_PATH = f"{TEMPLATE_DIR}/dose_response.json"
+TEST_PCHEM_PATH = f"{TEMPLATE_DIR}/tga.json"
 
 TEST_EXCEL_ERROR_UUID = "015690ac-b26a-4845-826e-c479a62eef62"
 TEST_EXCEL_ERROR = f"{TEMPLATE_DIR}/{TEST_EXCEL_ERROR_UUID}.json"
@@ -64,7 +65,7 @@ def test_doseresponse_resultsonly_template():
         assert "Materials" in xls.sheet_names
 
 def test_pchem_template():
-    with open(TEST_JSON_PATH, "r") as file:
+    with open(TEST_PCHEM_PATH, "r") as file:
         json_blueprint = json.load(file)
         json_blueprint["template_layout"] = ["pchem"]
         json_blueprint["data_sheets"] = ["data_processed"]

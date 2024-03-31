@@ -117,10 +117,50 @@ def get_nmparser_config(json_blueprint):
         config = json.load(json_file)
     return config
 
-def pchem_format_2excel(file_path,json_blueprint):
+def create_nested_headers_dataframe(dicts, 
+                keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}},
+                levels = ['group','name','unit'],lookup = {}):
+    # Initialize an empty DataFrame
+    df = pd.DataFrame()
+    # Iterate through the dictionaries
+    for key in keys:
+        params = dicts.get(key,[])
+        for param in params:
+            try:
+                tags = [lookup.get(key,key)]
+                for level in levels:
+                    tags.append(param.get(keys[key][level], "") )
+                #print(tags)
+                df[tuple(tags)] = None
+            except Exception as err:
+                print(err)
+                pass
+    # Create MultiIndex DataFrame
+    names = ['']
+    names.extend(levels)
+    df.columns = pd.MultiIndex.from_tuples(df.columns, names=names)
+    return df
+
+def pchem_format_2excel(file_path_xlsx,json_blueprint):
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
-    shutil.copy2(resource_file, file_path)
+    shutil.copy2(resource_file, file_path_xlsx)
+    with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
+        df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
+        df.to_excel(writer,sheet_name="Measuring_conditions")
+        df = create_nested_headers_dataframe(json_blueprint,keys=
+                {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
+                "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
+                levels = ['group','name'])
+        df.to_excel(writer,sheet_name="SAMPLES")        
+        df = create_nested_headers_dataframe(json_blueprint,keys=
+                {"raw_data_report" : {'name' : 'raw_endpoint', 'unit' : 'raw_unit'},
+                "question3" : {'name' : 'result_name', 'unit' : 'result_unit'}},
+                levels = ['name','unit'], 
+                lookup = {"raw_data_report" : "Raw data","question3" : "Results"}
+                )
+        df.to_excel(writer,sheet_name="Results_TABLE") 
+
 
 def add_plate_layout(file_path_xlsx,json_blueprint):
     print(json_blueprint.get("data_sheets"))
@@ -183,7 +223,7 @@ def get_template_frame(json_blueprint):
         result_df[["param_name","type","position","datamodel","value"]],
         treatment[["param_name","type","position","datamodel","value"]]
         ], ignore_index=True)
-    print(df_info)
+    #print(df_info)
 #:END: Please do not add information below this line
 #Template version	{{ || version }}
 #Template authors	{{ || acknowledgements }}
