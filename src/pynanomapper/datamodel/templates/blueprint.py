@@ -5,7 +5,7 @@ from datetime import datetime
 from xlsxwriter.utility import xl_col_to_name
 import shutil
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, NamedStyle
 from openpyxl import load_workbook
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
@@ -181,32 +181,64 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
     resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
     shutil.copy2(resource_file, file_path_xlsx)
     with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
+        sheet = writer.book["Provider_informations"]
+        sheet["E7"] = json_blueprint.get("METHOD","")
+        sheet["C2"] = json_blueprint.get("EXPERIMENT","")
+        sheet["B10"] = json_blueprint.get("template_name","")
+        sheet["B11"] = json_blueprint.get("template_status","")
+        sheet["B12"] = json_blueprint.get("template_author","")
+        sheet["B13"] = json_blueprint.get("template_acknowledgment","")    
+        sheet["B15"] = datetime.now().strftime("%Y-%m-%d")                                     
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"raw_data_report" : {'name' : 'raw_endpoint','type' : 'raw_aggregate', 'unit' : 'raw_unit'},
                 "question3" : {'name' : 'result_name','type' : 'result_aggregate','unit' : 'result_unit'}},
                 levels = ['name','type','unit'], 
                 lookup = {"raw_data_report" : "Raw data","question3" : "Results"}
                 )
-        df.insert(0, 'Material ID',None)
-        df.insert(1, 'Position_ID',None)
+        #df.insert(0, 'Material ID',None)
+        df.insert(0, 'Position_ID',None)
         df.to_excel(writer,sheet_name="Results_TABLE") 
+        sheet = writer.book["Results_TABLE"]
+        sheet["A1"] = "Material ID"
+        sheet["A2"] = ""
+        sheet["A3"] = ""
+        sheet["A4"] = ""
         autofit_columns(writer.book["Results_TABLE"],df.columns)
 
         df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        df.insert(0, 'Position_ID',None)        
+        #df.insert(0, 'Position_ID',None)        
         df.to_excel(writer,sheet_name="Measuring_conditions")
+        sheet = writer.book["Measuring_conditions"]
+        sheet["A1"] = "Position_ID"
+        sheet["A2"] = ""
+        sheet["A3"] = ""
+        sheet["A4"] = ""        
         autofit_columns(writer.book["Measuring_conditions"],df.columns)
 
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
                 "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
-                levels = ['group','name'], lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation"})
+                levels = ['group','name'], 
+        lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation", "group" : ""})
         df.insert(0, 'Material ID',None)
         df.to_excel(writer,sheet_name="SAMPLES")     
         autofit_columns(writer.book["SAMPLES"],df.columns)
-    
+    add_hidden_jsondef(file_path_xlsx,json_blueprint)
 
-
+def add_hidden_jsondef(file_path_xlsx,json_blueprint):
+    try:
+        workbook = load_workbook(file_path_xlsx)
+        hidden_sheet = workbook.create_sheet("TemplateDesigner")
+        hidden_sheet.sheet_state = 'hidden'
+        hidden_sheet['A1'] = "uuid"
+        hidden_sheet['B1'] = "surveyjs"
+        hidden_sheet['A2'] = json_blueprint.get("template_uuid","")
+        hidden_sheet['B2'] = str(json_blueprint)
+        hidden_sheet['B2'].style = NamedStyle(name='hidden', hidden=True)  # Hide the cell
+        workbook.save(file_path_xlsx)
+    except Exception as err:
+        print(err)  
+            
 def add_plate_layout(file_path_xlsx,json_blueprint):
     print(json_blueprint.get("data_sheets"))
     if "data_platelayout" in json_blueprint.get("data_sheets",[]):
