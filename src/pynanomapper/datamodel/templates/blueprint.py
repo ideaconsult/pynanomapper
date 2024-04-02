@@ -6,7 +6,7 @@ from xlsxwriter.utility import xl_col_to_name
 import shutil
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
-
+from openpyxl import load_workbook
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
     #print(df.columns)
@@ -182,15 +182,18 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
     shutil.copy2(resource_file, file_path_xlsx)
     with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
         df = create_nested_headers_dataframe(json_blueprint,keys=
-                {"raw_data_report" : {'name' : 'raw_endpoint', 'unit' : 'raw_unit'},
-                "question3" : {'name' : 'result_name', 'unit' : 'result_unit'}},
-                levels = ['name','unit'], 
+                {"raw_data_report" : {'name' : 'raw_endpoint','type' : 'raw_aggregate', 'unit' : 'raw_unit'},
+                "question3" : {'name' : 'result_name','type' : 'result_aggregate','unit' : 'result_unit'}},
+                levels = ['name','type','unit'], 
                 lookup = {"raw_data_report" : "Raw data","question3" : "Results"}
                 )
+        df.insert(0, 'Material ID',None)
+        df.insert(1, 'Position_ID',None)
         df.to_excel(writer,sheet_name="Results_TABLE") 
         autofit_columns(writer.book["Results_TABLE"],df.columns)
 
         df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
+        df.insert(0, 'Position_ID',None)        
         df.to_excel(writer,sheet_name="Measuring_conditions")
         autofit_columns(writer.book["Measuring_conditions"],df.columns)
 
@@ -198,9 +201,10 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
                 {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
                 "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
                 levels = ['group','name'], lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation"})
+        df.insert(0, 'Material ID',None)
         df.to_excel(writer,sheet_name="SAMPLES")     
         autofit_columns(writer.book["SAMPLES"],df.columns)
-
+    
 
 
 def add_plate_layout(file_path_xlsx,json_blueprint):

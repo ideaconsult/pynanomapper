@@ -14,7 +14,7 @@ TEST_EXCEL_ERROR = f"{TEMPLATE_DIR}/{TEST_EXCEL_ERROR_UUID}.json"
 TEMPLATE_UUID = "3c22a1f0-a933-4855-848d-05fcc26ceb7a"
 
 def test_doseresponse_template():
-    with open(TEST_JSON_PATH, "r") as file:
+    with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
         assert(Path(_path).exists())
@@ -25,7 +25,7 @@ def test_doseresponse_template():
         assert "Materials" in xls.sheet_names        
 
 def test_doseresponse_rawonly_template():
-    with open(TEST_JSON_PATH, "r") as file:
+    with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         json_blueprint["data_sheets"] = ["data_raw","data_platelayout"]
         _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
@@ -41,7 +41,7 @@ def test_doseresponse_rawonly_template():
         assert "plate_materials" in xls.sheet_names
 
 def test_doseresponse_error_template():
-    with open(TEST_EXCEL_ERROR, "r") as file:
+    with open(TEST_EXCEL_ERROR, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         json_blueprint["data_sheets"] = ["data_raw"]
         _path = get_template_xlsx(TEST_EXCEL_ERROR_UUID,json_blueprint)
@@ -53,7 +53,7 @@ def test_doseresponse_error_template():
         assert "Materials" in xls.sheet_names
 
 def test_doseresponse_resultsonly_template():
-    with open(TEST_JSON_PATH, "r") as file:
+    with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         json_blueprint["data_sheets"] = ["data_processed"]
         _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
@@ -65,7 +65,7 @@ def test_doseresponse_resultsonly_template():
         assert "Materials" in xls.sheet_names
 
 def test_pchem_template():
-    with open(TEST_PCHEM_PATH, "r") as file:
+    with open(TEST_PCHEM_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         json_blueprint["template_layout"] = ["pchem"]
         json_blueprint["data_sheets"] = ["data_processed"]
@@ -79,7 +79,7 @@ def test_pchem_template():
         assert "Materials" in xls.sheet_names
 
 def test_doseresponse_nmparser():
-    with open(TEST_JSON_PATH, "r") as file:
+    with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         _path = get_nmparser_config(TEMPLATE_UUID,json_blueprint)
         assert(Path(_path).exists())
