@@ -37,7 +37,7 @@ def json2frame(json_data,sortby=None):
 def get_method_metadata(json_blueprint):
 
     _header = {
-    "Project Work Package" : json_blueprint.get("provenance_workpackage",""),
+    "Project Work Package" : json_blueprint.get("provenance_project",""),
     "Partner conducting test/assay" : json_blueprint.get("provenance_workpackage",""),
     "Test facility - Laboratory name" : json_blueprint.get("provenance_provider",""),
     "Lead Scientist & contact for test" : json_blueprint.get("provenance_contact",""),
@@ -175,20 +175,39 @@ def autofit_columns(sheet,cols=None):
             sheet.cell(row=1, column=col_num+1).fill = pf
         #break
         
-
+def autofit_multilevel(df,worksheet):
+    for idx, col in enumerate(df.columns):
+        # Find the maximum length of the column header (using the last level of multi-index)
+        max_length = max(len(str(level)) for level in col) + 1
+        # Set the column width based on the length of the column header
+        worksheet.set_column(idx, idx, max_length)
+    
 def pchem_format_2excel(file_path_xlsx,json_blueprint):
+    _SHEET_INFO =  "Provider_informations"
+    _SHEET_RAW = "Raw_data_TABLE" 
+    _SHEET_RESULT = "Results_TABLE"
+    _SHEET_MATERIAL = "Materials"    
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
-    resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
-    shutil.copy2(resource_file, file_path_xlsx)
-    with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
-        sheet = writer.book["Provider_informations"]
-        sheet["E7"] = json_blueprint.get("METHOD","")
-        sheet["C2"] = json_blueprint.get("EXPERIMENT","")
-        sheet["B10"] = json_blueprint.get("template_name","")
-        sheet["B11"] = json_blueprint.get("template_status","")
-        sheet["B12"] = json_blueprint.get("template_author","")
-        sheet["B13"] = json_blueprint.get("template_acknowledgment","")    
-        sheet["B15"] = datetime.now().strftime("%Y-%m-%d")                                     
+    #resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
+    #shutil.copy2(resource_file, file_path_xlsx)
+    with pd.ExcelWriter(file_path_xlsx, engine='xlsxwriter', mode='w') as writer:
+        #sheet = writer.book["Provider_informations"]
+        worksheet = writer.book.add_worksheet(_SHEET_INFO)
+        bold_format = writer.book.add_format({'bold': True})
+        orange_bg_format = writer.book.add_format({'bg_color': '#FFF2CC'})
+        material_format = writer.book.add_format({'bg_color': '#00B0F0'})
+        position_format = writer.book.add_format({'bg_color': '#FFC000'})
+        #_colors = { "top" : '#002060' , "orange" : '#FFC000', 'skyblue' : '#00B0F0' , 'grey' : '#C0C0C0', 'input' : '#FFF2CC'}
+        for t in [("A2","General information"),
+                  ("A10","Template name"),("A11","Template version "), ("A12","Template authors"),("A13","Template acknowledgment"),
+                ("A6","Project"),("A7","Workpackage"),("A8","Partner"),("D7","Study"),("A15","Template downloaded"),("B15",datetime.now().strftime("%Y-%m-%d"))]:
+            worksheet.write(t[0],t[1], bold_format)                
+        for t in [("E7","METHOD"),("C2","EXPERIMENT"), ("B10","template_name"),("B11","template_status"),
+                ("B12","template_author"),("B13","template_acknowledgment"),
+                ("B6","provenance_project"),("B7","provenance_workpackage"),("B8","provenance_provider")]:
+            worksheet.write(t[0],json_blueprint.get(t[1],""),orange_bg_format)
+
+        worksheet = writer.book.add_worksheet(_SHEET_RESULT)                      
         df = create_nested_headers_dataframe(json_blueprint,keys=
                 {"raw_data_report" : {'name' : 'raw_endpoint','type' : 'raw_aggregate', 'unit' : 'raw_unit'},
                 "question3" : {'name' : 'result_name','type' : 'result_aggregate','unit' : 'result_unit'}},
@@ -197,32 +216,59 @@ def pchem_format_2excel(file_path_xlsx,json_blueprint):
                 )
         #df.insert(0, 'Material ID',None)
         df.insert(0, 'Position_ID',None)
-        df.to_excel(writer,sheet_name="Results_TABLE") 
-        sheet = writer.book["Results_TABLE"]
-        sheet["A1"] = "Material ID"
-        sheet["A2"] = ""
-        sheet["A3"] = ""
-        sheet["A4"] = ""
-        autofit_columns(writer.book["Results_TABLE"],df.columns)
+        df.to_excel(writer,sheet_name=_SHEET_RESULT) 
+        worksheet = writer.book.get_worksheet_by_name(_SHEET_RESULT)
+        worksheet.write('A1', 'Material ID',material_format)
+        worksheet.write('A2', ' ',material_format)
+        worksheet.write('A3', ' ',material_format)
+        worksheet.write('A4', ' ',material_format)      
+        worksheet.write('B1', 'Position_ID',position_format)
+        worksheet.write('B2', ' ',position_format)
+        worksheet.write('B3', ' ',position_format)
+        worksheet.write('B4', ' ',position_format)            
+        autofit_multilevel(df,worksheet)
 
         df = create_nested_headers_dataframe(json_blueprint,keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        #df.insert(0, 'Position_ID',None)        
-        df.to_excel(writer,sheet_name="Measuring_conditions")
-        sheet = writer.book["Measuring_conditions"]
-        sheet["A1"] = "Position_ID"
-        sheet["A2"] = ""
-        sheet["A3"] = ""
-        sheet["A4"] = ""        
-        autofit_columns(writer.book["Measuring_conditions"],df.columns)
+        _SHEET_MEASUREMENT = "Measuring_conditions"
+        df.to_excel(writer,sheet_name=_SHEET_MEASUREMENT)
+        worksheet = writer.book.get_worksheet_by_name(_SHEET_MEASUREMENT)
+        worksheet.write('A1', 'Position_ID',position_format)
+        worksheet.write('A2', ' ',position_format)
+        worksheet.write('A3', ' ',position_format)
+        worksheet.write('A4', ' ',position_format)     
+        worksheet.write('A5', '1',position_format)     
+        worksheet.write('A6', '2',position_format)
+        position_identifiers_range = "{}!$A5:$A1048576".format(_SHEET_MEASUREMENT)  # Entire column A
+        writer.book.define_name('Position_Identifiers', position_identifiers_range)           
+        autofit_multilevel(df,worksheet)   
+        validation = {
+            'validate': 'list',
+            'source': '=Position_Identifiers'
+        }
+        writer.book.get_worksheet_by_name(_SHEET_RESULT).data_validation("B5:B1048576", validation)        
 
-        df = create_nested_headers_dataframe(json_blueprint,keys=
-                {"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
+        df = create_nested_headers_dataframe(json_blueprint,keys={
+                #"METADATA_SAMPLE_INFO" : {'group' : 'param_sample_group', 'name' : 'param_sample_name'},
                 "METADATA_SAMPLE_PREP" : {'group' : 'param_sampleprep_group', 'name' : 'param_sampleprep_name'}},
                 levels = ['group','name'], 
         lookup = {'METADATA_SAMPLE_INFO' : "Sample", "METADATA_SAMPLE_PREP" : "Sample preparation", "group" : ""})
-        df.insert(0, 'Material ID',None)
         df.to_excel(writer,sheet_name="SAMPLES")     
-        autofit_columns(writer.book["SAMPLES"],df.columns)
+        worksheet = writer.book.get_worksheet_by_name("SAMPLES")
+        worksheet.write('A1', 'Material ID',material_format)
+        worksheet.write('A2', ' ',material_format)
+        worksheet.write('A3', ' ',material_format)
+        
+        validation = {
+            'validate': 'list',
+            'source': '=ERM_Identifiers'
+        }
+        writer.book.get_worksheet_by_name("SAMPLES").data_validation("A4:A1048576", validation)          
+        autofit_multilevel(df,worksheet)
+        
+    
+        materials_sheet = create_materials_sheet(writer.book,writer,
+                                    materials=_SHEET_MATERIAL,
+                                    info=None,results=[_SHEET_RESULT],material_column="A5:A1048576")
     add_hidden_jsondef(file_path_xlsx,json_blueprint)
 
 def add_hidden_jsondef(file_path_xlsx,json_blueprint):
@@ -240,7 +286,6 @@ def add_hidden_jsondef(file_path_xlsx,json_blueprint):
         print(err)  
             
 def add_plate_layout(file_path_xlsx,json_blueprint):
-    print(json_blueprint.get("data_sheets"))
     if "data_platelayout" in json_blueprint.get("data_sheets",[]):
         platexlsx = "platelayout_{}well.xlsx".format(json_blueprint.get("data_platelayout",96) )
         current_script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -473,8 +518,8 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
                                     info=_SHEET_INFO,results=linksheets)
 
 
-def create_materials_sheet(workbook,writer,materials,info,results):
-    info_sheet = writer.sheets[info]
+def create_materials_sheet(workbook,writer,materials,info=None,results=[],material_column="A3:A1048576"):
+    info_sheet = None if info is None else writer.sheets[info]
     materials_sheet = workbook.add_worksheet(materials)
     column_headers = get_materials_columns()
     table = pd.DataFrame(columns=column_headers)
@@ -486,19 +531,21 @@ def create_materials_sheet(workbook,writer,materials,info,results):
         'validate': 'list',
         'source': '=ERM_Identifiers'
     }
-    info_sheet.data_validation(validation_cell, validation)
-    vlookup = [('B26',3),('B27',9),('B28',4),('B29',6),('B31',8)]
-    for v in vlookup:
-        formula = '=VLOOKUP($B$25,Materials!B:J,"{}",FALSE)'.format(v[1])
-        info_sheet.write_formula(v[0], formula)
-    readonly_format = workbook.add_format({'locked': True})
+    if not info_sheet is None:
+        info_sheet.data_validation(validation_cell, validation)
+        vlookup = [('B26',3),('B27',9),('B28',4),('B29',6),('B31',8)]
+        for v in vlookup:
+            formula = '=VLOOKUP($B$25,Materials!B:J,"{}",FALSE)'.format(v[1])
+            info_sheet.write_formula(v[0], formula)
+        readonly_format = workbook.add_format({'locked': True})
     
     for result in results:
         try:
             result_sheet = writer.sheets[result]        
-            result_sheet.data_validation("A3:A1048576", validation)
+            result_sheet.data_validation(material_column, validation)
             #protect_headers(result_sheet,readonly_format)
-        except:
+        except Exception as err:
+            print(err)
             pass
     return materials_sheet
 
