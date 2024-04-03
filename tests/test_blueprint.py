@@ -28,6 +28,7 @@ def test_doseresponse_rawonly_template():
     with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
         json_blueprint["data_sheets"] = ["data_raw","data_platelayout"]
+        json_blueprint["plate_format"] = 384
         _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
         assert(Path(_path).exists())
         xls = pd.ExcelFile(_path)

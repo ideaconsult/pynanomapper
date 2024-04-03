@@ -7,6 +7,9 @@ import shutil
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill, NamedStyle
 from openpyxl import load_workbook
+from openpyxl.comments import Comment
+from copy import copy
+
 def iom_format(df,param_name="param_name",param_group="param_group"):
     df.fillna(" ",inplace=True)
     #print(df.columns)
@@ -290,14 +293,40 @@ def add_plate_layout(file_path_xlsx,json_blueprint):
         platexlsx = "platelayout_{}well.xlsx".format(json_blueprint.get("plate_format",96) )
         current_script_directory = os.path.dirname(os.path.abspath(__file__))
         resource_file = os.path.join(current_script_directory, "../../resource/nmparser",platexlsx)
-        # Open the existing Excel file for appending
-        with pd.ExcelWriter(file_path_xlsx, engine='openpyxl', mode='a') as writer:
-            # Load sheets from the second Excel file
-            with pd.ExcelFile(resource_file) as another_xls:
-                for sheet_name in another_xls.sheet_names:
-                    df = pd.read_excel(resource_file, sheet_name=sheet_name)
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)       
+        copy_sheets(resource_file, file_path_xlsx)
 
+def copy_sheets(source_file, destination_file):
+    # Load the source Excel file
+    source_wb = load_workbook(source_file)
+    # Load the destination Excel file
+    destination_wb = load_workbook(destination_file)
+    
+    # Iterate over each sheet in the source Excel file
+    for sheet_name in source_wb.sheetnames:
+        # Get the source sheet
+        source_sheet = source_wb[sheet_name]
+        # Create a new sheet in the destination file with the same name
+        destination_sheet = destination_wb.create_sheet(sheet_name)
+        # Iterate over each row in the source sheet
+        for row in source_sheet.iter_rows(values_only=True):
+            destination_sheet.append(row)
+        # Copy formulas from the source sheet to the destination sheet
+        for row in source_sheet.iter_rows():
+            for cell in row:
+                if cell.data_type == 'f':
+                    destination_sheet[cell.coordinate].value = cell.value
+                if cell.comment:
+                    # Create a new comment on the destination cell
+                    destination_sheet[cell.coordinate].comment = Comment(cell.comment.text, cell.comment.author)
+                cell_dst = destination_sheet[cell.coordinate]    
+                cell_dst.font = copy(cell.font)
+                cell_dst.fill = copy(cell.fill)
+                cell_dst.border = copy(cell.border)
+                cell_dst.alignment = copy(cell.alignment)
+                cell_dst.number_format = copy(cell.number_format)
+                cell_dst.protection = copy(cell.protection)
+
+    destination_wb.save(destination_file)
 
 def get_template_frame(json_blueprint):
     if "METADATA_SAMPLE_INFO" in json_blueprint:
