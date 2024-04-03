@@ -287,7 +287,7 @@ def add_hidden_jsondef(file_path_xlsx,json_blueprint):
             
 def add_plate_layout(file_path_xlsx,json_blueprint):
     if "data_platelayout" in json_blueprint.get("data_sheets",[]):
-        platexlsx = "platelayout_{}well.xlsx".format(json_blueprint.get("data_platelayout",96) )
+        platexlsx = "platelayout_{}well.xlsx".format(json_blueprint.get("plate_format",96) )
         current_script_directory = os.path.dirname(os.path.abspath(__file__))
         resource_file = os.path.join(current_script_directory, "../../resource/nmparser",platexlsx)
         # Open the existing Excel file for appending
