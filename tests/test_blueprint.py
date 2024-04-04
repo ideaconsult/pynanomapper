@@ -8,6 +8,7 @@ import pandas as pd
 TEMPLATE_DIR = Path(__file__).parent / "resources/templates"
 TEST_JSON_PATH = f"{TEMPLATE_DIR}/dose_response.json"
 TEST_PCHEM_PATH = f"{TEMPLATE_DIR}/tga.json"
+TEST_FRAS_PATH  = f"{TEMPLATE_DIR}/fras.json"
 
 TEST_EXCEL_ERROR_UUID = "015690ac-b26a-4845-826e-c479a62eef62"
 TEST_EXCEL_ERROR = f"{TEMPLATE_DIR}/{TEST_EXCEL_ERROR_UUID}.json"
@@ -40,6 +41,18 @@ def test_doseresponse_rawonly_template():
         assert "plate_metadata" in xls.sheet_names
         assert "plate_readout" in xls.sheet_names
         assert "plate_materials" in xls.sheet_names
+
+def test_doseresponse_fras_template():
+    with open(TEST_FRAS_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        _path = get_template_xlsx(TEMPLATE_UUID,json_blueprint)
+        assert(Path(_path).exists())
+        xls = pd.ExcelFile(_path)
+        assert "Raw_data_TABLE" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names  
+        assert "Test_conditions" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+      
 
 def test_doseresponse_error_template():
     with open(TEST_EXCEL_ERROR, "r", encoding='utf-8') as file:

@@ -107,6 +107,8 @@ def get_treatment(json_blueprint):
             tag =item['condition_type'].split('_')[1][0].upper()
             _start = 0 if isconcentration else 1
             tmp.append({'param_name': "{} series labels".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" : [f"{tag}{i}" if i <= 3 else "" for i in range(1, _maxfields + 1)]})
+        else:
+            _start = 0
         tmp.append({'param_name': "{}".format(item[name]), 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : item['condition_type'], "value" :  [i if i<=(2+_start) else "" for i in range(_start, _maxfields + _start + 1)]})
         if isconcentration:
             tmp.append({'param_name': "Treatment type series", 'type': 'names', 'position' : '0', 'position_label' : 0,'datamodel' : "c_treatment", "value" : ""})
