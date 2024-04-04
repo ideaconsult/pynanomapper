@@ -8,7 +8,7 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
 
 env:
-  POETRY_VERSION: 1.7.1
+  POETRY_VERSION: 1.8.2
 
 jobs:
 
