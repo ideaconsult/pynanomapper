@@ -566,7 +566,7 @@ def create_materials_sheet(workbook,writer,materials,info=None,results=[],materi
         info_sheet.data_validation(validation_cell, validation)
         vlookup = [('B26',3),('B27',9),('B28',4),('B29',6),('B31',8)]
         for v in vlookup:
-            formula = '=VLOOKUP($B$25,Materials!B:J,"{}",FALSE)'.format(v[1])
+            formula = '=VLOOKUP(B$25,Materials!$B:$J,"{}",FALSE)'.format(v[1])
             info_sheet.write_formula(v[0], formula)
         readonly_format = workbook.add_format({'locked': True})
     
