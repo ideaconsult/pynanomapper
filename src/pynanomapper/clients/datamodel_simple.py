@@ -79,7 +79,7 @@ class StudyRaman:
         if xlinspace is None:
             xlinspace = StudyRaman.x4search()
         spe = rc2.spectrum.Spectrum(x=x, y=y, metadata={})
-        (spe,hist_dist,index) = StudyRaman.spectra2dist(spe,xcrop = [xlinspace[0],xlinspace[-1]],remove_baseline=True,window=window)
+        (spe,hist_dist,index) = StudyRaman.spectra2dist(spe,xcrop = [xlinspace[0],xlinspace[-1]],remove_baseline=remove_baseline,window=window)
         return (hist_dist.cdf(xlinspace),hist_dist.pdf(xlinspace))
 
     @staticmethod
