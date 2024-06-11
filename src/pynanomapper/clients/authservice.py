@@ -43,7 +43,9 @@ class TokenService():
     def getHeaders(self):
         headers = {}
         headers["Accept"] = "application/json"
-        headers["Authorization"] = "Bearer {}".format(self.token['access_token'])
+        _token = self.token['access_token']
+        if _token != None:
+            headers["Authorization"] = "Bearer {}".format(_token)
         return headers
 
 

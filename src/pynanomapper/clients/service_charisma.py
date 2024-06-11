@@ -135,12 +135,16 @@ class H5Service(H5BasicService):
 
     def solrquery_get(self,solr_url, params):
         headers = {}
-        headers["Authorization"] = "Bearer {}".format(self.tokenservice.api_key());
+        _token = self.tokenservice.api_key()
+        if _token != None:
+            headers["Authorization"] = "Bearer {}".format(_token);
         return requests.get(solr_url, params = params, headers= headers)
 
     def solrquery_post(self,solr_url, json):
         headers = {}
-        headers["Authorization"] = "Bearer {}".format(self.tokenservice.api_key());
+        _token = self.tokenservice.api_key()
+        if _token != None:
+            headers["Authorization"] = "Bearer {}".format(_token);
         return requests.get(solr_url, json = json, headers= headers)
 
     def thumbnail(self,solr_url,domain,figsize=(6,4),extraprm=""):
