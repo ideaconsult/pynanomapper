@@ -40,8 +40,8 @@ def json2frame(json_data,sortby=None):
 def get_method_metadata(json_blueprint):
 
     _header = {
-    "Project Work Package" : json_blueprint.get("provenance_project",""),
-    "Partner conducting test/assay" : json_blueprint.get("provenance_workpackage",""),
+    "Project Work Package" : json_blueprint.get("provenance_workpackage",""),
+    "Partner conducting test/assay" : json_blueprint.get("provenance_provider",""),
     "Test facility - Laboratory name" : json_blueprint.get("provenance_provider",""),
     "Lead Scientist & contact for test" : json_blueprint.get("provenance_contact",""),
     "Assay/Test work conducted by" : json_blueprint.get("provenance_operator",""),
@@ -458,6 +458,8 @@ def iom_format_2excel(file_path, df_info,df_result,df_raw=None,df_conditions=Non
         workbook = writer.book
         worksheet = workbook.add_worksheet(_sheet)
         worksheet.set_column(1, 1, 20)
+
+
         #writer.sheets[_sheet]
         cell_format_def = {
                     "group" :  {'bg_color': _colors['grey'], 'font_color' : 'blue', 'text_wrap': True, 'bold': True},
