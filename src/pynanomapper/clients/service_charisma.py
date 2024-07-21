@@ -201,14 +201,15 @@ class H5Service(H5BasicService):
         except Exception as err:
             return self.empty_figure(figsize,"Error","{}".format(domain.split("/")[-1]))
 
-    def knnquery(self,domain,dataset="raw"):
+    def knnquery(self,domain,dataset="raw",dim=1024):
         try:
             with self.File(domain,mode="r") as h5:
                 x = h5[dataset][0]
                 y = h5[dataset][1]
-                (cdf,pdf) = StudyRaman.h52embedding(h5,dataset="raw",xlinspace = StudyRaman.x4search())
+                (cdf,pdf) = StudyRaman.h52embedding(h5,dataset="raw",xlinspace = StudyRaman.x4search(dim=dim))
                 result_json = {}
-                result_json["cdf"] = compress(cdf.tolist(),precision=6)
+                result_json["cdf"] = compress(cdf.tolist(),precision=4)
+                result_json["pdf"] = compress(pdf.tolist(),precision=4)
                 #return ','.join(map(str, cdf))
                 try:
                     px = 1/plt.rcParams['figure.dpi']  # pixel in inches

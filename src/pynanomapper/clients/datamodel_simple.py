@@ -34,8 +34,8 @@ class StudyRaman:
         self.spectrum_embedding = spectrum_embedding
 
     @staticmethod
-    def x4search():
-        return np.linspace(140,3*1024+140,num=1024)
+    def x4search(dim=1024):
+        return np.linspace(140,3*1024+140,num=dim)
         #return np.linspace(140,140+2048,num=1024)
 
     @staticmethod
