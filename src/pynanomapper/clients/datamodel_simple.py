@@ -83,12 +83,12 @@ class StudyRaman:
         return (hist_dist.cdf(xlinspace),hist_dist.pdf(xlinspace))
 
     @staticmethod
-    def h52embedding(h5,dataset="raw",xlinspace = None):
+    def h52embedding(h5,dataset="raw",xlinspace = None,remove_baseline=True,window=16):
         if xlinspace is None:
             xlinspace = StudyRaman.x4search()
         x = h5[dataset][0]
         y = h5[dataset][1]
-        return StudyRaman.xy2embedding(x,y,xlinspace)
+        return StudyRaman.xy2embedding(x,y,xlinspace,remove_baseline=remove_baseline,window=window)
 
     def to_solr_json(self):
         _solr = {}
