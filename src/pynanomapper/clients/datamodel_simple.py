@@ -34,8 +34,8 @@ class StudyRaman:
         self.spectrum_embedding = spectrum_embedding
 
     @staticmethod
-    def x4search():
-        return np.linspace(140,3*1024+140,num=1024)
+    def x4search(dim=1024):
+        return np.linspace(140,3*1024+140,num=dim)
         #return np.linspace(140,140+2048,num=1024)
 
     @staticmethod
@@ -79,16 +79,16 @@ class StudyRaman:
         if xlinspace is None:
             xlinspace = StudyRaman.x4search()
         spe = rc2.spectrum.Spectrum(x=x, y=y, metadata={})
-        (spe,hist_dist,index) = StudyRaman.spectra2dist(spe,xcrop = [xlinspace[0],xlinspace[-1]],remove_baseline=True,window=window)
+        (spe,hist_dist,index) = StudyRaman.spectra2dist(spe,xcrop = [xlinspace[0],xlinspace[-1]],remove_baseline=remove_baseline,window=window)
         return (hist_dist.cdf(xlinspace),hist_dist.pdf(xlinspace))
 
     @staticmethod
-    def h52embedding(h5,dataset="raw",xlinspace = None):
+    def h52embedding(h5,dataset="raw",xlinspace = None,remove_baseline=True,window=16):
         if xlinspace is None:
             xlinspace = StudyRaman.x4search()
         x = h5[dataset][0]
         y = h5[dataset][1]
-        return StudyRaman.xy2embedding(x,y,xlinspace)
+        return StudyRaman.xy2embedding(x,y,xlinspace,remove_baseline=remove_baseline,window=window)
 
     def to_solr_json(self):
         _solr = {}

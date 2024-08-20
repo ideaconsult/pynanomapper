@@ -40,7 +40,8 @@ class BearerAuth(AuthBase):
         self.token = token
 
     def __call__(self, r):
-        r.headers['Authorization'] = "Bearer {}".format(self.token)
+        if self.token != None:
+            r.headers['Authorization'] = "Bearer {}".format(self.token)
         return r
 
     def setKey(self, token):
