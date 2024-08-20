@@ -5,4 +5,4 @@ def test_import():
     from pynanomapper import client_ambit
     from pynanomapper import client_solr
     from pynanomapper import units
-    from pynanomapper.datamodel import ambit
+    from pyambit.datamodel import ambit
