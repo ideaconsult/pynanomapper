@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pynanomapper"
-version = "2.0.0rc2"
+version = "2.0.0"
 description = "eNanoMapper API client"
 authors = [
   "Nina Jeliazkova <jeliazkova.nina@gmail.com>",
