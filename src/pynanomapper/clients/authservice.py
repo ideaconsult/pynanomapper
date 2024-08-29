@@ -2,6 +2,7 @@ import requests
 import h5py,h5pyd
 import traceback
 from keycloak import KeycloakOpenID
+import time 
 
 def get_kcclient (keycloak_server_url,keycloak_client_id,keycloak_realm_name,client_secret_key):
     return KeycloakOpenID(
@@ -27,8 +28,8 @@ class TokenService():
     def refresh_token(self):
         self.token = self.kcclient.refresh_token(self.token['refresh_token'])
 
-    def token(self):
-        return self.token
+    #def token(self):
+    #    return self.token
 
     def api_key(self):
         return self.token['access_token']
@@ -48,6 +49,16 @@ class TokenService():
             headers["Authorization"] = "Bearer {}".format(_token)
         return headers
 
+    def token_time_left(self):
+        if not self.token:
+            return True
+
+        # Decode the access token to get its expiration time
+        decoded_token = self.kcclient.decode_token(self.token['access_token'])
+        expiration_time = decoded_token['exp']
+        current_time = time.time()
+
+        return expiration_time - current_time
 
 class QueryService():
     def __init__(self,tokenservice):
