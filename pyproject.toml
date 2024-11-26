@@ -39,14 +39,14 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
 jproperties = "^2.1.1"
+measurement = "^3.2.2"
 nexusformat = "^1.0.2"
+openpyxl = "^3.1.2"
 pandas = "^2.0.3"
+pyambit = "^0.0.1"
 pyyaml = ">=5.1"
 requests = "^2.31.0"
 xlsxwriter = "^3.1.9"
-measurement = "^3.2.2"
-openpyxl = "^3.1.2"
-pyambit = "^0.0.1"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/ideaconsult/pynanomapper/issues"
