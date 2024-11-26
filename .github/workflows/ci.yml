@@ -1,18 +1,22 @@
 ---
+name: CI
+
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
       - master
-      - tests
   pull_request:
+    branches:
+      - master
   workflow_dispatch:
 
 env:
-  POETRY_VERSION: 1.8.2
+  POETRY_VERSION: 1.8.4
 
 jobs:
 
   test:
+
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,24 +27,28 @@ jobs:
           - '3.12'
 
     steps:
+
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Get the precise Python version
+        run: echo "PYTHON_ID=$( python -VV | sha256sum | awk '{ print $1 }' )" >> "$GITHUB_ENV"
+
       - name: Load the cached Poetry installation
         id: cached-poetry
-        uses: actions/cache@v4
+        uses: actions/cache@v4.1.2
         with:
           path: ~/.local
-          key: poetry-${{ env.POETRY_VERSION }}-0
+          key: poetry-${{ env.POETRY_VERSION }}-py_${{ env.PYTHON_ID}}-0
 
       - name: Install Poetry
         if: steps.cached-poetry.outputs.cache-hit != 'true'
-        uses: snok/install-poetry@v1
+        uses: snok/install-poetry@v1.4.1
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: true
@@ -48,7 +56,7 @@ jobs:
 
       - name: Load the cached dependencies
         id: cached-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v4.1.2
         with:
           path: .venv
           key: py${{ matrix.python-version }}-deps-${{ hashFiles('**/poetry.lock') }}
