@@ -51,7 +51,7 @@ class TokenService():
 
     def token_time_left(self):
         if not self.token:
-            return True
+            return 0
 
         # Decode the access token to get its expiration time
         decoded_token = self.kcclient.decode_token(self.token['access_token'])
