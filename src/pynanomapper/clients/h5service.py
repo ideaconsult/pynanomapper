@@ -8,11 +8,18 @@ class H5BasicService(QueryService):
     def __init__(self, tokenservice):
         super().__init__(tokenservice)
 
-    def File(self, name, mode='r', retries=1):
-        return h5pyd.File(name, mode=mode, retries=retries, api_key=self.tokenservice.api_key())
+    def File(self, name, mode='r', retries=1, **kwargs):
+        kwargs["name"] = name
+        kwargs["mode"] = mode
+        kwargs["retries"] = retries
+        kwargs.setdefault("api_key", self.tokenservice.api_key())
+        return h5pyd.File(**kwargs)
 
-    def Folder(self, name, mode='r', owner=None):
-        return h5pyd.Folder(name, mode=mode,  api_key=self.tokenservice.api_key(), owner=owner)
+    def Folder(self, name, mode='r', **kwargs):
+        kwargs["name"] = name
+        kwargs["mode"] = mode
+        kwargs.setdefault("api_key", self.tokenservice.api_key())
+        return h5pyd.Folder(**kwargs)
 
     def check_folder(self, domain="/", create=False, owner=None):
         #cfg = hsinfo.cfg
