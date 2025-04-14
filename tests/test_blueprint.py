@@ -23,7 +23,8 @@ def test_doseresponse_template():
         assert "Raw_data_TABLE" in xls.sheet_names
         assert "Results_TABLE" in xls.sheet_names
         assert "Test_conditions" in xls.sheet_names
-        assert "Materials" in xls.sheet_names        
+        assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
 
 def test_doseresponse_rawonly_template():
     with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
@@ -41,6 +42,7 @@ def test_doseresponse_rawonly_template():
         assert "plate_metadata" in xls.sheet_names
         assert "plate_readout" in xls.sheet_names
         assert "plate_materials" in xls.sheet_names
+        read_hidden_json(xls)
 
 def test_doseresponse_fras_template():
     with open(TEST_FRAS_PATH, "r", encoding='utf-8') as file:
@@ -52,6 +54,7 @@ def test_doseresponse_fras_template():
         assert "Results_TABLE" in xls.sheet_names  
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
       
 
 def test_doseresponse_error_template():
@@ -65,6 +68,7 @@ def test_doseresponse_error_template():
         assert not "Results_TABLE" in xls.sheet_names  
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
 
 def test_doseresponse_resultsonly_template():
     with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
@@ -77,6 +81,19 @@ def test_doseresponse_resultsonly_template():
         assert "Results_TABLE" in xls.sheet_names        
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
+
+def read_hidden_json(xls):
+    assert "TemplateDesigner" in xls.sheet_names
+    # Load B2 from TemplateDesigner
+    df = pd.read_excel(xls, sheet_name="TemplateDesigner", header=None)
+    b2_content = df.iloc[1, 1]  # B2 is (1,1) with zero-based indexing
+    assert isinstance(b2_content, str), "Cell B2 content should be a string"
+    try:
+        template_dict = json.loads(b2_content)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"B2 content is not valid JSON: {e}")
+    assert isinstance(template_dict, dict), "Parsed B2 content should be a dictionary"    
 
 def test_pchem_template():
     with open(TEST_PCHEM_PATH, "r", encoding='utf-8') as file:
@@ -91,6 +108,7 @@ def test_pchem_template():
         assert "Provider_informations" in xls.sheet_names
         assert "Measuring_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
 
 def test_doseresponse_nmparser():
     with open(TEST_JSON_PATH, "r", encoding='utf-8') as file:
