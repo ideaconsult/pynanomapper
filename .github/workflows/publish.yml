@@ -1,12 +1,12 @@
 ---
 name: Publish Python package to PyPI
 
+permissions:
+  contents: read
+
 on:  # yamllint disable-line rule:truthy
   release:
     types: [published]
-
-permissions:
-  contents: read
 
 env:
   POETRY_VERSION: '2.1.3'
