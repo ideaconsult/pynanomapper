@@ -336,6 +336,8 @@ def add_hidden_jsondef(file_path_xlsx, json_blueprint):
         hidden_sheet['B1'] = "surveyjs"
         hidden_sheet['A2'] = json_blueprint.get("template_uuid", "")
         hidden_sheet['B2'] = json.dumps(json_blueprint)
+        hidden_sheet['A3'] = "version"
+        hidden_sheet['B3'] = "1.01"        
         hidden_sheet['B2'].style = NamedStyle(name='hidden', hidden=True)  # Hide the cell
         workbook.save(file_path_xlsx)
     except Exception as err:
