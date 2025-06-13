@@ -68,7 +68,7 @@ def get_method_metadata(bp_json):
 def get_materials_metadata(json_blueprint):
     sample_group_dict = {}
     for item in json_blueprint.get("METADATA_SAMPLE_INFO"):
-        group = item["param_sample_group"]
+        group = item.get("param_sample_group","DEFAULT")
         name = item["param_sample_name"]
         sample_group_dict.setdefault(group, []).append(name)    
     _header = {
@@ -468,7 +468,6 @@ def results_table(df_result, df_conditions=None,
     try:
         result_unit = df_result[result_unit]
     except Exception as err:
-        print(err)
         result_unit = None
 
     header1 = list(["Material"])
