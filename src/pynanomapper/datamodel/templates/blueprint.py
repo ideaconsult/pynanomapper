@@ -450,7 +450,11 @@ def get_template_frame(json_blueprint):
         df_raw = pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
     else:
         df_raw = None
-    return df_info, df_result, df_raw, df_conditions
+    if "calibration_report" in json_blueprint["data_sheets"]:
+        df_calibration = pd.DataFrame(json_blueprint["calibration_report"]) if "calibration_report" in json_blueprint else None
+    else:
+        df_calibration = None    
+    return df_info, df_result, df_raw, df_conditions, df_calibration
 
 
 def get_unit_by_condition_name(json_blueprint, name):
@@ -490,7 +494,9 @@ def results_table(df_result, df_conditions=None,
         return pd.DataFrame(columns=header1)
 
 
-def iom_format_2excel(file_path, df_info, df_result, df_raw=None, df_conditions=None):
+def iom_format_2excel(
+        file_path, df_info, df_result, 
+        df_raw=None, df_conditions=None, df_calibration=None):
     _SHEET_INFO = "Test_conditions"
     _SHEET_RAW = "Raw_data_TABLE"
     _SHEET_RESULT = "Results_TABLE"
