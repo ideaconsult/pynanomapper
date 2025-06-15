@@ -92,6 +92,7 @@ def test_doseresponse_resultsonly_template():
 def test_doseresponse_calibration_template():
     with open(TEST_CALIBRATION_PATH, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
+        assert("calibration_report" in json_blueprint)
         _path = get_template_xlsx(TEMPLATE_UUID, json_blueprint)
         assert(Path(_path).exists())
         xls = pd.ExcelFile(_path)
@@ -146,6 +147,7 @@ def get_template_xlsx(uuid, json_blueprint):
         if layout == "dose_response": 
             df_info, df_result, df_raw, df_conditions, df_calibrate = bp.get_template_frame(
                 json_blueprint)
+            print(df_calibrate)
             bp.iom_format_2excel(file_path_xlsx, df_info, df_result, df_raw, df_conditions, df_calibrate)
             bp.add_plate_layout(file_path_xlsx, json_blueprint)
             json_blueprint["template_uuid"] = uuid            

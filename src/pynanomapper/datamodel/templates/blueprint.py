@@ -450,7 +450,7 @@ def get_template_frame(json_blueprint):
         df_raw = pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
     else:
         df_raw = None
-    if "calibration_report" in json_blueprint["data_sheets"]:
+    if "data_calibration" in json_blueprint["data_sheets"]:
         df_calibration = pd.DataFrame(json_blueprint["calibration_report"]) if "calibration_report" in json_blueprint else None
     else:
         df_calibration = None    
@@ -467,14 +467,14 @@ def get_unit_by_condition_name(json_blueprint, name):
 def results_table(df_result, df_conditions=None,
                   result_name='result_name',
                   result_unit='result_unit',
-                  results_conditions='results_conditions'):
+                  results_conditions='results_conditions', sample_column="Material"):
     result_names = df_result[result_name]
     try:
         result_unit = df_result[result_unit]
     except Exception as err:
         result_unit = None
 
-    header1 = list(["Material"])
+    header1 = list([sample_column])
     header2 = list([""])
     if results_conditions in df_result.columns:
         unique_conditions = set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions)
@@ -600,10 +600,12 @@ def iom_format_2excel(
             linksheets.append(_sheet)
 
         if df_calibration is not None:
+            print(df_calibration)
             _sheet = _SHEET_CALIBRATION 
-            new_df = results_table(df_calibration, result_name='calibration_endpoint', 
+            new_df = results_table(df_calibration, result_name='calibration_entry', 
                                    result_unit="calibration_unit",
-                                   results_conditions='calibration_conditions')
+                                   results_conditions='calibration_conditions',
+                                   sample_column="Sample")
             new_df.to_excel(writer, sheet_name=_sheet, index=False, 
                             freeze_panes=(2, 0))
             worksheet = writer.sheets[_sheet]
