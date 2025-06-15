@@ -287,7 +287,7 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
 
         df = create_nested_headers_dataframe(json_blueprint,
                                              keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        _SHEET_MEASUREMENT = "Measuring_conditions"
+        _SHEET_MEASUREMENT = "Experimental setup"
         df.to_excel(writer, sheet_name=_SHEET_MEASUREMENT)
         worksheet = writer.book.get_worksheet_by_name(_SHEET_MEASUREMENT)
         worksheet.write('A1', 'Position_ID',position_format)

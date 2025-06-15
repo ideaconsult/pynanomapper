@@ -128,7 +128,7 @@ def test_pchem_template():
         #assert not "Raw_data_TABLE" in xls.sheet_names
         assert "Results_TABLE" in xls.sheet_names
         assert "Provider_informations" in xls.sheet_names
-        assert "Measuring_conditions" in xls.sheet_names
+        assert "Experimental setup" in xls.sheet_names
         assert "Materials" in xls.sheet_names
         read_hidden_json(xls)
 
