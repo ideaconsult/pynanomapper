@@ -600,7 +600,6 @@ def iom_format_2excel(
             linksheets.append(_sheet)
 
         if df_calibration is not None:
-            print(df_calibration)
             _sheet = _SHEET_CALIBRATION 
             new_df = results_table(df_calibration, result_name='calibration_entry', 
                                    result_unit="calibration_unit",
