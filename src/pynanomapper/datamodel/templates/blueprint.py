@@ -169,23 +169,55 @@ def create_nested_headers_dataframe(dicts,
                                     levels=['group', 'name', 'unit'],
                                     lookup={'METADATA_SAMPLE_INFO': "Sample", "METADATA_SAMPLE_PREP": "Sample preparation",
                                         "OTHER_SAMPLEPREP": "",
-                                        "raw_data_report": "Raw data", "question3": "Results"}
+                                        "raw_data_report": "Raw data", "question3": "Results"},
+                                    condition_field=[ "raw_conditions","results_conditions"]
                                     ):
     # Initialize an empty DataFrame
     df = pd.DataFrame()
+    # Build global condition metadata lookup
+    condition_meta = {
+        cond.get("conditon_name"): {
+            "unit": cond.get("condition_unit", ""),
+            "type": cond.get("condition_type", "")
+        }
+        for cond in dicts.get("conditions", [])
+        if cond.get("conditon_name")
+    }    
+
     # Iterate through the dictionaries
+    key_conditions = set()    
     for key in keys:
         params = dicts.get(key, [])
+        # Collect all unique conditions for this key
+        for param in params:
+            for cf in condition_field:
+                if cf in param:
+                    key_conditions.update(param.get(cf, []))
+
+    # Add one column per unique condition (once per key)
+    for cond_name in key_conditions:
+        cond_info = condition_meta.get(cond_name, {})
+        cond_tags = ["Experimental factors"]
+        cond_tags.append(cond_name)
+        cond_tags.append("")
+        cond_tags.append(cond_info.get("unit",""))
+        df[tuple(cond_tags)] = None
+
+    for key in keys:
+        params = dicts.get(key, [])
+        top_label = lookup.get(key, key)
         for param in params:
             try:
-                tags = [lookup.get(key, key)]
+                tags = [top_label]
                 for level in levels:
                     _tmp = param.get(keys[key][level], "")
                     tags.append(lookup.get(_tmp, _tmp) )
                 df[tuple(tags)] = None
             except Exception as err:
-                print(err)
-                pass
+                print(f"Error processing param: {e}")
+                continue
+
+
     # Create MultiIndex DataFrame
     names = ['']
     names.extend(levels)
@@ -270,7 +302,8 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
                                              levels=['name', 'type', 'unit'],
                                              lookup={
                                                  "raw_data_report": "Raw data",
-                                                 "question3": "Results"}
+                                                 "question3": "Results"},
+                                             condition_field=[ "raw_conditions","results_conditions"]
                                             )
         #df.insert(0, 'Material ID',None)
         df.insert(0, 'Position_ID',None)

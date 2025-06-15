@@ -10,12 +10,15 @@
     ],
     "METHOD": "TGA",
     "EXPERIMENT": "TGA",
+    "conditions": [
+        {
+            "conditon_name": "Replicate",
+            "condition_type": "c_replicate_tech"
+        }
+    ],    
     "question3": [
         {
             "results_conditions": [
-                "Concentration",
-                "Time",
-                "Experiment",
                 "Replicate"
             ],
             "result_name": "Mass loss 1",

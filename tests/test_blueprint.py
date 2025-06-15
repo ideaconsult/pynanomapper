@@ -61,6 +61,20 @@ def test_doseresponse_fras_template():
         read_hidden_json(xls)
       
 
+def test_doseresponse_fras_template_aspchem():
+    with open(TEST_FRAS_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        json_blueprint["template_layout"] = "pchem"
+        _path = get_template_xlsx(TEMPLATE_UUID, json_blueprint)
+        assert Path(_path).exists()
+        xls = pd.ExcelFile(_path)
+        assert "Experimental_setup" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names  
+        assert "Provider_informations" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
+              
+
 def test_doseresponse_error_template():
     with open(TEST_EXCEL_ERROR, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
