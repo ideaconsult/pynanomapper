@@ -142,7 +142,7 @@ def test_pchem_template():
         #assert not "Raw_data_TABLE" in xls.sheet_names
         assert "Results_TABLE" in xls.sheet_names
         assert "Provider_informations" in xls.sheet_names
-        assert "Experimental setup" in xls.sheet_names
+        assert "Experimental_setup" in xls.sheet_names
         assert "Materials" in xls.sheet_names
         read_provenance(xls,"pchem",
                         json_blueprint.get("provenance_project",None),

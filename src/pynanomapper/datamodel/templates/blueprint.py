@@ -232,6 +232,7 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
     _SHEET_RAW = "Raw_data_TABLE"
     _SHEET_RESULT = "Results_TABLE"
     _SHEET_MATERIAL = "Materials"
+    _SHEET_MEASUREMENT = "Experimental_setup"
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     #resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
     #shutil.copy2(resource_file, file_path_xlsx)
@@ -287,15 +288,15 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
 
         df = create_nested_headers_dataframe(json_blueprint,
                                              keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        _SHEET_MEASUREMENT = "Experimental setup"
+        
         df.to_excel(writer, sheet_name=_SHEET_MEASUREMENT)
         worksheet = writer.book.get_worksheet_by_name(_SHEET_MEASUREMENT)
         worksheet.write('A1', 'Position_ID',position_format)
         worksheet.write('A2', ' ', position_format)
         worksheet.write('A3', ' ', position_format)
         worksheet.write('A4', ' ', position_format)     
-        worksheet.write('A5', '1', position_format)     
-        worksheet.write('A6', '2', position_format)
+        worksheet.write('A5', 'P1', position_format)     
+        worksheet.write('A6', 'P2', position_format)
         position_identifiers_range = "{}!$A5:$A1048576".format(_SHEET_MEASUREMENT)  # Entire column A
         writer.book.define_name('Position_Identifiers', position_identifiers_range)           
         autofit_multilevel(df, worksheet)   
