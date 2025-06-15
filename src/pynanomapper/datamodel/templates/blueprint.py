@@ -500,6 +500,7 @@ def iom_format_2excel(
     _SHEET_INFO = "Test_conditions"
     _SHEET_RAW = "Raw_data_TABLE"
     _SHEET_RESULT = "Results_TABLE"
+    _SHEET_CALIBRATION = "Calibration_TABLE"
     _SHEET_MATERIAL = "Materials"
     _guide = [
     "Please complete all applicable fields below as far as possible. Aim to familiarise yourself with the Introductory Guidance and Example Filled Templates.",
@@ -567,9 +568,7 @@ def iom_format_2excel(
         #conc_range = "{}!$B$72:$G$72".format(_SHEET_INFO)  # Entire column B
         #workbook.define_name('CONCENTRATIONS', conc_range)
         linksheets = []
-        if df_raw is None:
-            pass
-        else:
+        if df_raw is not None:
             _sheet = _SHEET_RAW
             linksheets = [_sheet]
             new_df = results_table(df_raw, df_conditions,
@@ -589,9 +588,7 @@ def iom_format_2excel(
     
             #worksheet.add_table(3, 1, 1048576, len(new_df.columns), {'header_row': True, 'name': _SHEET_RAW})
 
-        if df_result is None:
-            pass
-        else:
+        if df_result is not None:
             _sheet = _SHEET_RESULT 
             new_df = results_table(df_result, result_name='result_name', 
                                    results_conditions='results_conditions')
@@ -601,6 +598,18 @@ def iom_format_2excel(
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
             linksheets.append(_sheet)
+
+        if df_calibration is not None:
+            _sheet = _SHEET_CALIBRATION 
+            new_df = results_table(df_calibration, result_name='calibration_endpoint', 
+                                   result_unit="calibration_unit",
+                                   results_conditions='calibration_conditions')
+            new_df.to_excel(writer, sheet_name=_sheet, index=False, 
+                            freeze_panes=(2, 0))
+            worksheet = writer.sheets[_sheet]
+            for i, col in enumerate(new_df.columns):
+                worksheet.set_column(i, i, len(col) + 1 )
+            linksheets.append(_sheet)            
 
         materials_sheet = create_materials_sheet(
             workbook, writer, materials=_SHEET_MATERIAL,

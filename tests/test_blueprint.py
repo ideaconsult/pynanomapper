@@ -9,6 +9,7 @@ TEMPLATE_DIR = Path(__file__).parent / "resources/templates"
 TEST_JSON_PATH = f"{TEMPLATE_DIR}/dose_response.json"
 TEST_PCHEM_PATH = f"{TEMPLATE_DIR}/tga.json"
 TEST_FRAS_PATH = f"{TEMPLATE_DIR}/fras.json"
+TEST_CALIBRATION_PATH = f"{TEMPLATE_DIR}/calibration.json"
 
 TEST_EXCEL_ERROR_UUID = "015690ac-b26a-4845-826e-c479a62eef62"
 TEST_EXCEL_ERROR = f"{TEMPLATE_DIR}/{TEST_EXCEL_ERROR_UUID}.json"
@@ -83,6 +84,20 @@ def test_doseresponse_resultsonly_template():
         xls = pd.ExcelFile(_path)
         assert "Raw_data_TABLE" not in xls.sheet_names
         assert "Results_TABLE" in xls.sheet_names        
+        assert "Test_conditions" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
+
+
+def test_doseresponse_calibration_template():
+    with open(TEST_CALIBRATION_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        _path = get_template_xlsx(TEMPLATE_UUID, json_blueprint)
+        assert(Path(_path).exists())
+        xls = pd.ExcelFile(_path)
+        assert "Raw_data_TABLE" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names
+        assert "Calibration_TABLE" in xls.sheet_names
         assert "Test_conditions" in xls.sheet_names
         assert "Materials" in xls.sheet_names
         read_hidden_json(xls)
