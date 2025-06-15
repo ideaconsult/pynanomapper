@@ -1,0 +1,156 @@
+{
+    "SOP": "protocol_research",
+    "conditions": [
+        {
+            "conditon_name": "Concentration",
+            "condition_unit": "Âµg/mL",
+            "condition_type": "c_concentration"
+        },
+        {
+            "conditon_name": "Time",
+            "condition_unit": "h",
+            "condition_type": "c_time"
+        },
+        {
+            "conditon_name": "Replicate",
+            "condition_type": "c_replicate_tech"
+        }
+    ],
+    "PROTOCOL_TOP_CATEGORY": "TOX",
+    "data_sheets": [
+        "data_raw",
+        "data_processed",
+        "data_platelayout",
+        "data_calibration"
+    ],
+    "plate_format": "96",
+    "METADATA_SAMPLE_INFO": [
+        {
+            "param_sample_name": "Material ID",
+            "param_sample_group": "ID"
+        },
+        {
+            "param_sample_name": "Material name",
+            "param_sample_group": "NAME"
+        },
+        {
+            "param_sample_name": "Material supplier",
+            "param_sample_group": "SUPPLIER"
+        },
+        {
+            "param_sample_name": "Material size",
+            "param_sample_group": "OTHER_METADATA"
+        }
+    ],
+    "template_layout": "dose_response",
+    "template_date": "2025-03-12",
+    "template_status": "DRAFT",
+    "template_name": "Automated Fluorescence Imaging Microscopy",
+    "template_author": "Markus Kirchner",
+    "template_acknowledgment": "POLYRISK / BfR",
+    "user_role": [
+        "role_lab"
+    ],
+    "METHOD": "AFIM",
+    "EXPERIMENT": "Uptake Quantification by Automated Fluorescence Imaging Microscopy",
+    "PROTOCOL_CATEGORY_CODE": "UNKNOWN_TOXICITY_SECTION",
+    "EXPERIMENT_PROTOCOL": "Quantification by measurement of Cell Area, Fluorescence Intensity within the Area, Number of Nuclei within the cell area",
+    "raw_data_report": [
+        {
+            "raw_endpoint": "Fluorescence Intensity/Area",
+            "raw_aggregate": "MEAN",
+            "raw_unit": "1/Âµm2",
+            "raw_endpoint_uncertainty": "SD",
+            "raw_type": "value_num",
+            "raw_conditions": [
+                "Concentration",
+                "Replicate"
+            ]
+        },
+        {
+            "raw_endpoint": "Cell number/Area",
+            "raw_aggregate": "MEAN",
+            "raw_unit": "1/Âµm2",
+            "raw_endpoint_uncertainty": "SD",
+            "raw_type": "value_num",
+            "raw_conditions": [
+                "Concentration",
+                "Replicate"
+            ]
+        }
+    ],
+    "question3": [
+        {
+            "result_name": "Average particle uptake per cell",
+            "result_aggregate": "NORMALIZED",
+            "result_endpoint_uncertainty": "SD",
+            "result_type": "value_num",
+            "results_conditions": [
+                "Concentration",
+                "Replicate"
+            ]
+        }
+    ],
+    "RESULTS": "Data analysis is done by automated processing of fluorescence images.\nSamples will be processed by analyzing analyzing for Fluorescence intensity per Area, calibrating Fluorescence Intensity/Area to Polymer mass/Area, normalizing by Cell number/Area to reach Polymer mass per Cell. And finally use the average particle volume to calculate Average particle uptake per cell.",
+    "METADATA_PARAMETERS": [
+        {
+            "param_name": "Cell Line",
+            "param_group": "CELL LINE DETAILS",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Passage",
+            "param_group": "CELL LINE DETAILS",
+            "param_type": "value_num"
+        },
+        {
+            "param_name": "Instrument name",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Processing software",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Laser Exposure Time",
+            "param_unit": "ms",
+            "param_group": "MEASUREMENT CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_name": "Calibration curve",
+            "param_group": "CALIBRATION",
+            "param_type": "value_text"
+        }
+    ],
+    "METADATA_SAMPLE_PREP": [
+        {
+            "param_sampleprep_name": "Protocol for cell staining",
+            "param_sampleprep_group": "OTHER_SAMPLEPREP",
+            "param_type": "value_text"
+        }
+    ],
+    "provenance_project": "POLYRISK",
+    "provenance_workpackage": "WP2",
+    "template_author_orcid": "0009-0000-0589-4443",
+    "calibration_report": [
+        {
+            "calibration_entry": "Fluorescence Intensity/Area",
+            "calibration_aggregate": "RAW_DATA",
+            "calibration_entry_type": "value_num",
+            "calibration_conditions": [
+                "Concentration"
+            ]
+        },
+        {
+            "calibration_entry": "Polymer mass/Area",
+            "calibration_aggregate": "RAW_DATA",
+            "calibration_entry_type": "value_num",
+            "calibration_conditions": [
+                "Concentration"
+            ]
+        }
+    ]
+}

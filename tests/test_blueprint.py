@@ -9,6 +9,7 @@ TEMPLATE_DIR = Path(__file__).parent / "resources/templates"
 TEST_JSON_PATH = f"{TEMPLATE_DIR}/dose_response.json"
 TEST_PCHEM_PATH = f"{TEMPLATE_DIR}/tga.json"
 TEST_FRAS_PATH = f"{TEMPLATE_DIR}/fras.json"
+TEST_CALIBRATION_PATH = f"{TEMPLATE_DIR}/calibration.json"
 
 TEST_EXCEL_ERROR_UUID = "015690ac-b26a-4845-826e-c479a62eef62"
 TEST_EXCEL_ERROR = f"{TEMPLATE_DIR}/{TEST_EXCEL_ERROR_UUID}.json"
@@ -60,6 +61,20 @@ def test_doseresponse_fras_template():
         read_hidden_json(xls)
       
 
+def test_doseresponse_fras_template_aspchem():
+    with open(TEST_FRAS_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        json_blueprint["template_layout"] = "pchem"
+        _path = get_template_xlsx(TEMPLATE_UUID, json_blueprint)
+        assert Path(_path).exists()
+        xls = pd.ExcelFile(_path)
+        assert "Experimental_setup" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names  
+        assert "Provider_informations" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+        read_hidden_json(xls)
+              
+
 def test_doseresponse_error_template():
     with open(TEST_EXCEL_ERROR, "r", encoding='utf-8') as file:
         json_blueprint = json.load(file)
@@ -88,6 +103,35 @@ def test_doseresponse_resultsonly_template():
         read_hidden_json(xls)
 
 
+def test_doseresponse_calibration_template():
+    with open(TEST_CALIBRATION_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        assert("calibration_report" in json_blueprint)
+        _path = get_template_xlsx(TEMPLATE_UUID, json_blueprint)
+        assert(Path(_path).exists())
+        xls = pd.ExcelFile(_path)
+        assert "Raw_data_TABLE" in xls.sheet_names
+        assert "Results_TABLE" in xls.sheet_names
+        assert "Calibration_TABLE" in xls.sheet_names
+        assert "Test_conditions" in xls.sheet_names
+        assert "Materials" in xls.sheet_names
+        read_provenance(xls,"dose_response","Project",
+                        json_blueprint.get("provenance_workpackage",None))
+        read_hidden_json(xls)
+
+
+def read_provenance(xls, layout="pchem", project=None, wp=None):
+    info_sheet = "Provider_informations" if layout == "pchem" else "Test_conditions"
+    assert info_sheet in xls.sheet_names
+    df = pd.read_excel(xls, sheet_name=info_sheet, header=None)
+    # pchem b6 else a1
+    project_content = df.iloc[12,1] if layout == "pchem"  else df.iloc[0,0] 
+    assert project == project_content
+    # pchem B7 else B8 
+    wp_content = df.iloc[6,1] if layout == "pchem" else df.iloc[7,1]  #B8
+    assert wp == wp_content
+
+
 def read_hidden_json(xls):
     assert "TemplateDesigner" in xls.sheet_names
     # Load B2 from TemplateDesigner
@@ -112,8 +156,11 @@ def test_pchem_template():
         #assert not "Raw_data_TABLE" in xls.sheet_names
         assert "Results_TABLE" in xls.sheet_names
         assert "Provider_informations" in xls.sheet_names
-        assert "Measuring_conditions" in xls.sheet_names
+        assert "Experimental_setup" in xls.sheet_names
         assert "Materials" in xls.sheet_names
+        read_provenance(xls,"pchem",
+                        json_blueprint.get("provenance_project",None),
+                        json_blueprint.get("provenance_workpackage",None))
         read_hidden_json(xls)
 
 
@@ -129,9 +176,9 @@ def get_template_xlsx(uuid, json_blueprint):
         file_path_xlsx = os.path.join(TEMPLATE_DIR, f"{uuid}.xlsx")   
         layout = json_blueprint.get("template_layout","dose_response")
         if layout == "dose_response": 
-            df_info, df_result, df_raw, df_conditions = bp.get_template_frame(
+            df_info, df_result, df_raw, df_conditions, df_calibrate = bp.get_template_frame(
                 json_blueprint)
-            bp.iom_format_2excel(file_path_xlsx, df_info, df_result, df_raw, df_conditions)
+            bp.iom_format_2excel(file_path_xlsx, df_info, df_result, df_raw, df_conditions, df_calibrate)
             bp.add_plate_layout(file_path_xlsx, json_blueprint)
             json_blueprint["template_uuid"] = uuid            
             bp.add_hidden_jsondef(file_path_xlsx, json_blueprint)

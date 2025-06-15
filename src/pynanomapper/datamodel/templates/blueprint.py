@@ -68,7 +68,7 @@ def get_method_metadata(bp_json):
 def get_materials_metadata(json_blueprint):
     sample_group_dict = {}
     for item in json_blueprint.get("METADATA_SAMPLE_INFO"):
-        group = item["param_sample_group"]
+        group = item.get("param_sample_group","DEFAULT")
         name = item["param_sample_name"]
         sample_group_dict.setdefault(group, []).append(name)    
     _header = {
@@ -169,23 +169,55 @@ def create_nested_headers_dataframe(dicts,
                                     levels=['group', 'name', 'unit'],
                                     lookup={'METADATA_SAMPLE_INFO': "Sample", "METADATA_SAMPLE_PREP": "Sample preparation",
                                         "OTHER_SAMPLEPREP": "",
-                                        "raw_data_report": "Raw data", "question3": "Results"}
+                                        "raw_data_report": "Raw data", "question3": "Results"},
+                                    condition_field=[ "raw_conditions","results_conditions"]
                                     ):
     # Initialize an empty DataFrame
     df = pd.DataFrame()
+    # Build global condition metadata lookup
+    condition_meta = {
+        cond.get("conditon_name"): {
+            "unit": cond.get("condition_unit", ""),
+            "type": cond.get("condition_type", "")
+        }
+        for cond in dicts.get("conditions", [])
+        if cond.get("conditon_name")
+    }    
+
     # Iterate through the dictionaries
+    key_conditions = set()    
     for key in keys:
         params = dicts.get(key, [])
+        # Collect all unique conditions for this key
+        for param in params:
+            for cf in condition_field:
+                if cf in param:
+                    key_conditions.update(param.get(cf, []))
+
+    # Add one column per unique condition (once per key)
+    for cond_name in key_conditions:
+        cond_info = condition_meta.get(cond_name, {})
+        cond_tags = ["Experimental factors"]
+        cond_tags.append(cond_name)
+        cond_tags.append("")
+        cond_tags.append(cond_info.get("unit",""))
+        df[tuple(cond_tags)] = None
+
+    for key in keys:
+        params = dicts.get(key, [])
+        top_label = lookup.get(key, key)
         for param in params:
             try:
-                tags = [lookup.get(key, key)]
+                tags = [top_label]
                 for level in levels:
                     _tmp = param.get(keys[key][level], "")
                     tags.append(lookup.get(_tmp, _tmp) )
                 df[tuple(tags)] = None
             except Exception as err:
-                print(err)
-                pass
+                print(f"Error processing param: {e}")
+                continue
+
+
     # Create MultiIndex DataFrame
     names = ['']
     names.extend(levels)
@@ -232,6 +264,7 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
     _SHEET_RAW = "Raw_data_TABLE"
     _SHEET_RESULT = "Results_TABLE"
     _SHEET_MATERIAL = "Materials"
+    _SHEET_MEASUREMENT = "Experimental_setup"
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     #resource_file = os.path.join(current_script_directory, "../../resource/nmparser","template_pchem.xlsx")
     #shutil.copy2(resource_file, file_path_xlsx)
@@ -269,7 +302,8 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
                                              levels=['name', 'type', 'unit'],
                                              lookup={
                                                  "raw_data_report": "Raw data",
-                                                 "question3": "Results"}
+                                                 "question3": "Results"},
+                                             condition_field=[ "raw_conditions","results_conditions"]
                                             )
         #df.insert(0, 'Material ID',None)
         df.insert(0, 'Position_ID',None)
@@ -287,15 +321,15 @@ def pchem_format_2excel(file_path_xlsx, json_blueprint):
 
         df = create_nested_headers_dataframe(json_blueprint,
                                              keys={"METADATA_PARAMETERS" : {'group' : 'param_group', 'name' : 'param_name', 'unit' : 'param_unit'}})
-        _SHEET_MEASUREMENT = "Measuring_conditions"
+        
         df.to_excel(writer, sheet_name=_SHEET_MEASUREMENT)
         worksheet = writer.book.get_worksheet_by_name(_SHEET_MEASUREMENT)
         worksheet.write('A1', 'Position_ID',position_format)
         worksheet.write('A2', ' ', position_format)
         worksheet.write('A3', ' ', position_format)
         worksheet.write('A4', ' ', position_format)     
-        worksheet.write('A5', '1', position_format)     
-        worksheet.write('A6', '2', position_format)
+        worksheet.write('A5', 'P1', position_format)     
+        worksheet.write('A6', 'P2', position_format)
         position_identifiers_range = "{}!$A5:$A1048576".format(_SHEET_MEASUREMENT)  # Entire column A
         writer.book.define_name('Position_Identifiers', position_identifiers_range)           
         autofit_multilevel(df, worksheet)   
@@ -336,6 +370,8 @@ def add_hidden_jsondef(file_path_xlsx, json_blueprint):
         hidden_sheet['B1'] = "surveyjs"
         hidden_sheet['A2'] = json_blueprint.get("template_uuid", "")
         hidden_sheet['B2'] = json.dumps(json_blueprint)
+        hidden_sheet['A3'] = "version"
+        hidden_sheet['B3'] = "1.01"        
         hidden_sheet['B2'].style = NamedStyle(name='hidden', hidden=True)  # Hide the cell
         workbook.save(file_path_xlsx)
     except Exception as err:
@@ -448,7 +484,11 @@ def get_template_frame(json_blueprint):
         df_raw = pd.DataFrame(json_blueprint["raw_data_report"]) if "raw_data_report" in json_blueprint else None
     else:
         df_raw = None
-    return df_info, df_result, df_raw, df_conditions
+    if "data_calibration" in json_blueprint["data_sheets"]:
+        df_calibration = pd.DataFrame(json_blueprint["calibration_report"]) if "calibration_report" in json_blueprint else None
+    else:
+        df_calibration = None    
+    return df_info, df_result, df_raw, df_conditions, df_calibration
 
 
 def get_unit_by_condition_name(json_blueprint, name):
@@ -461,15 +501,14 @@ def get_unit_by_condition_name(json_blueprint, name):
 def results_table(df_result, df_conditions=None,
                   result_name='result_name',
                   result_unit='result_unit',
-                  results_conditions='results_conditions'):
+                  results_conditions='results_conditions', sample_column="Material"):
     result_names = df_result[result_name]
     try:
         result_unit = df_result[result_unit]
     except Exception as err:
-        print(err)
         result_unit = None
 
-    header1 = list(["Material"])
+    header1 = list([sample_column])
     header2 = list([""])
     if results_conditions in df_result.columns:
         unique_conditions = set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions)
@@ -489,10 +528,13 @@ def results_table(df_result, df_conditions=None,
         return pd.DataFrame(columns=header1)
 
 
-def iom_format_2excel(file_path, df_info, df_result, df_raw=None, df_conditions=None):
+def iom_format_2excel(
+        file_path, df_info, df_result, 
+        df_raw=None, df_conditions=None, df_calibration=None):
     _SHEET_INFO = "Test_conditions"
     _SHEET_RAW = "Raw_data_TABLE"
     _SHEET_RESULT = "Results_TABLE"
+    _SHEET_CALIBRATION = "Calibration_TABLE"
     _SHEET_MATERIAL = "Materials"
     _guide = [
     "Please complete all applicable fields below as far as possible. Aim to familiarise yourself with the Introductory Guidance and Example Filled Templates.",
@@ -560,9 +602,7 @@ def iom_format_2excel(file_path, df_info, df_result, df_raw=None, df_conditions=
         #conc_range = "{}!$B$72:$G$72".format(_SHEET_INFO)  # Entire column B
         #workbook.define_name('CONCENTRATIONS', conc_range)
         linksheets = []
-        if df_raw is None:
-            pass
-        else:
+        if df_raw is not None:
             _sheet = _SHEET_RAW
             linksheets = [_sheet]
             new_df = results_table(df_raw, df_conditions,
@@ -582,9 +622,7 @@ def iom_format_2excel(file_path, df_info, df_result, df_raw=None, df_conditions=
     
             #worksheet.add_table(3, 1, 1048576, len(new_df.columns), {'header_row': True, 'name': _SHEET_RAW})
 
-        if df_result is None:
-            pass
-        else:
+        if df_result is not None:
             _sheet = _SHEET_RESULT 
             new_df = results_table(df_result, result_name='result_name', 
                                    results_conditions='results_conditions')
@@ -594,6 +632,19 @@ def iom_format_2excel(file_path, df_info, df_result, df_raw=None, df_conditions=
             for i, col in enumerate(new_df.columns):
                 worksheet.set_column(i, i, len(col) + 1 )
             linksheets.append(_sheet)
+
+        if df_calibration is not None:
+            _sheet = _SHEET_CALIBRATION 
+            new_df = results_table(df_calibration, result_name='calibration_entry', 
+                                   result_unit="calibration_unit",
+                                   results_conditions='calibration_conditions',
+                                   sample_column="Sample")
+            new_df.to_excel(writer, sheet_name=_sheet, index=False, 
+                            freeze_panes=(2, 0))
+            worksheet = writer.sheets[_sheet]
+            for i, col in enumerate(new_df.columns):
+                worksheet.set_column(i, i, len(col) + 1 )
+            linksheets.append(_sheet)            
 
         materials_sheet = create_materials_sheet(
             workbook, writer, materials=_SHEET_MATERIAL,
