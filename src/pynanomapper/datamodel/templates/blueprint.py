@@ -8,6 +8,12 @@ from openpyxl.styles import PatternFill, NamedStyle
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
 from copy import copy
+import pyambit.datamodel as mb
+
+
+METADATA_PARAMETERS = "METADATA_PARAMETERS"
+METADATA_SAMPLE_PREP = "METADATA_SAMPLE_PREP"
+METADATA_SAMPLE_INFO = "METADATA_SAMPLE_INFO"
 
 
 def iom_format(df, param_name="param_name", param_group="param_group"):
@@ -153,6 +159,83 @@ def get_treatment(json_blueprint):
     return pd.DataFrame(tmp)
 
 
+def customize_config(json_blueprint, nmpconfig):
+
+    df_info, df_result, df_raw, df_conditions, df_calibrate = get_template_frame(
+        json_blueprint)
+    nmpconfig.get("TEMPLATE_INFO")["NAME"] = json_blueprint.get("template_name","")
+    for tag in ["template_author","template_author_orcid","template_acknowledgment",
+                "template_layout","template_status","template_date"]:
+        nmpconfig.get("TEMPLATE_INFO")[tag] = json_blueprint.get(tag,"")
+    offset = 7
+    papp = nmpconfig.get("PROTOCOL_APPLICATIONS")[0]
+    papp["PROTOCOL_CATEGORY_CODE"] = json_blueprint.get("PROTOCOL_CATEGORY_CODE")
+    papp["PROTOCOL_TOP_CATEGORY"] = json_blueprint.get("PROTOCOL_TOP_CATEGORY")
+
+    params = papp.get("PARAMETERS",{})
+    df_info["param_type"] = None
+    for param in json_blueprint.get(METADATA_PARAMETERS,[]):
+        _name = param.get("param_name",None)
+        df_info.loc[df_info["param_name"] == _name, "unit"] = param.get("param_unit",None)
+        df_info.loc[df_info["param_name"] == _name, "param_type"] = param.get("param_type","")
+        df_info.loc[df_info["param_name"] == _name, "param_group"] = param.get("param_group","")
+
+    for row in json_blueprint.get("question3",[]):
+        _name = param.get("result_name",None)
+        df_result.loc[df_result["result_name"] == _name, "result_aggregate"] = param.get("result_aggregate",None)
+        df_result.loc[df_result["result_name"] == _name, "result_endpoint_uncertainty"] = param.get("result_endpoint_uncertainty",None)
+
+    for index, row in df_info.iterrows():
+        _tmp = {"ITERATION": "ABSOLUTE_LOCATION",  "SHEET_INDEX": 1, "COLUMN_INDEX": "B"}
+        if row["datamodel"] in [METADATA_PARAMETERS, METADATA_SAMPLE_PREP]:
+            if row["type"] == "names":
+                _tmp["ROW_INDEX"] = row["position"] + offset
+                params[row["param_name"]] = _tmp
+        if row["param_name"] == "Full name of test/assay":
+            params["Assay"]["ROW_INDEX"] = row["position"] + offset
+
+    unique_conditions = sorted(set(condition for conditions in df_result["results_conditions"].dropna() for condition in conditions))
+    # results table
+    sheet_index = 1
+    effects = []
+    for result_type, name, unit,aggregate,errqualifier, df in [
+        ("RAW_DATA","raw_endpoint","raw_unit","raw_aggregate","raw_endpoint_uncertainty", df_raw), 
+        ("AGGREGATED", "result_name","result_unit", "result_aggregate","result_endpoint_uncertainty", df_result)]:
+        if df is None:
+            continue
+        sheet_index = sheet_index + 1
+        for index, row in df.iterrows():
+            effect = {
+                        "ENDPOINT": row[name].upper().replace(" ","_"),
+                        "ENDPOINT_TYPE" : result_type,
+                        "VALUE" : {
+                            "ITERATION": "ROW_SINGLE",
+                            "SHEET_INDEX": sheet_index,
+                            "COLUMN_INDEX":  chr(65 + len(unique_conditions) + index +1)
+                        },
+                        "UNIT": row[unit].upper().replace(" ","_"),
+                        "CONDITIONS" : {}
+                    }
+            if errqualifier in row and not pd.isna(row[errqualifier]):
+                effect["ERR_QUALIFIER"] = row[errqualifier]
+            if aggregate in row and not pd.isna(row[aggregate]):
+                effect["ENDPOINT_TYPE"] = row[aggregate]
+
+            for i, c in enumerate(unique_conditions):
+                row = df_conditions.loc[df_conditions["conditon_name"] == c]
+                if row.empty:
+                    continue
+                row = row.iloc[0]
+                _tmp = { "COLUMN_INDEX":  chr(65 + i +1), "ITERATION": "ROW_SINGLE", "SHEET_INDEX": 2}
+                if not pd.isna(row["condition_unit"]):
+                    _tmp["UNIT"] = row["condition_unit"]
+                effect["CONDITIONS"][c.upper()] = _tmp
+
+            effects.append(effect)
+    papp["EFFECTS"] = effects
+    return nmpconfig
+
+
 def get_nmparser_config(json_blueprint):
     current_directory = os.path.dirname(os.path.abspath(__file__))
     json_file_path = os.path.join(current_directory, 
@@ -161,13 +244,18 @@ def get_nmparser_config(json_blueprint):
     with open(json_file_path, 'r') as json_file:
         # Load the JSON data from the file
         config = json.load(json_file)
-    return config
+    try:
+        nmpconfig = customize_config(json_blueprint, config)
+        return nmpconfig
+    except Exception as err:
+        print(err)
 
 
 def create_nested_headers_dataframe(dicts,
-                                    keys={"METADATA_PARAMETERS": {'group': 'param_group', 'name': 'param_name', 'unit': 'param_unit'}},
+                                    keys={METADATA_PARAMETERS: {'group': 'param_group', 'name': 'param_name', 'unit': 'param_unit'}},
                                     levels=['group', 'name', 'unit'],
-                                    lookup={'METADATA_SAMPLE_INFO': "Sample", "METADATA_SAMPLE_PREP": "Sample preparation",
+                                    lookup={METADATA_SAMPLE_INFO: "Sample", 
+                                            METADATA_SAMPLE_PREP: "Sample preparation",
                                         "OTHER_SAMPLEPREP": "",
                                         "raw_data_report": "Raw data", "question3": "Results"},
                                     condition_field=[ "raw_conditions","results_conditions"]
@@ -511,7 +599,7 @@ def results_table(df_result, df_conditions=None,
     header1 = list([sample_column])
     header2 = list([""])
     if results_conditions in df_result.columns:
-        unique_conditions = set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions)
+        unique_conditions = sorted(set(condition for conditions in df_result[results_conditions].dropna() for condition in conditions))
         header1 = header1 + list(unique_conditions)
         for c in list(unique_conditions):
             try:
@@ -649,6 +737,13 @@ def iom_format_2excel(
         materials_sheet = create_materials_sheet(
             workbook, writer, materials=_SHEET_MATERIAL,
             info=_SHEET_INFO, results=linksheets)
+        #debug
+        df_info.to_excel(writer, sheet_name="df_info", index=False, freeze_panes=(2, 0))
+        if df_result is not None:
+            df_result.to_excel(writer, sheet_name="df_result", index=False, freeze_panes=(2, 0))
+        if df_raw is not None:
+            df_raw.to_excel(writer, sheet_name="df_raw", index=False, freeze_panes=(2, 0))
+        df_conditions.to_excel(writer, sheet_name="df_conditions", index=False, freeze_panes=(2, 0))
 
 
 def create_materials_sheet(workbook, writer, materials, info=None, results=[], material_column="A3:A1048576"):
@@ -687,3 +782,67 @@ def protect_headers(worksheet, readonly_format):
     worksheet.set_row(0, None, readonly_format)
     worksheet.set_row(1, None, readonly_format)
     worksheet.protect()
+
+
+def get_datamodel(json_blueprint):
+    df_info, df_result, df_raw, df_conditions = get_template_frame(
+        json_blueprint)
+    params = {}
+    for index, row in df_info.iterrows():
+        if row["datamodel"] == METADATA_PARAMETERS:
+            #unit = row["condition_unit"]
+            params[row["param_name"]] = mb.Value()
+    conditions = {} 
+    for index, row in df_conditions.iterrows():
+        unit = row["condition_unit"]
+        conditions[row["condition_name"]] = mb.Value(unit=unit)
+
+    effects = []
+    for index, row in df_raw.iterrows():
+        effects.append(mb.EffectRecord(
+            endpoint=row["result_name"],
+            endpointtype="RAW_DATA",
+            result=mb.EffectResult(
+                unit=row["result_unit"]
+            ),
+            conditions=conditions,
+            sampleID="sample123",
+        ))
+    for index, row in df_result.iterrows():
+        effects.append(mb.EffectRecord(
+            endpoint=row["result_name"],
+            endpointtype="type",
+            result=mb.EffectResult(
+                unit=row["result_unit"]
+            ),
+            conditions=conditions,
+            sampleID="sample123",
+        ))    
+
+    protocol = mb.Protocol(
+        topcategory="TOX",
+        category=mb.EndpointCategory(code="ABC123"),
+        endpoint="Some endpoint",
+        guideline=["Rule 1", "Rule 2"],
+    )
+    citation = mb.Citation(year=2024, title="Sample Title", owner="Sample Owner")    
+    papp = mb.ProtocolApplication(
+        uuid="123e4567-e89b-12d3-a456-426614174000",
+        interpretationResult="Result",
+        interpretationCriteria="Criteria",
+        parameters=params,
+        citation=citation,
+        effects=effects,
+        owner=mb.SampleLink.create(
+            sample_uuid="sample-uuid", sample_provider="Sample Provider"
+        ),
+        protocol=protocol,
+        investigation_uuid="investigation-uuid",
+        assay_uuid="assay-uuid",
+        updated="2024-08-15",
+    )
+    return papp
+
+def get_parameters(json_blueprint):
+    
+    return None

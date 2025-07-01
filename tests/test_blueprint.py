@@ -196,3 +196,13 @@ def get_nmparser_config(uuid, json_blueprint):
     with open(file_path, 'w') as json_file:
         json.dump(json_config, json_file, indent=2)
         return file_path
+    
+
+def test_fras_nmparser():
+    with open(TEST_FRAS_PATH, "r", encoding='utf-8') as file:
+        json_blueprint = json.load(file)
+        # print(json_blueprint)
+        _path = get_nmparser_config(
+            "c5dd3ac9-9340-44b0-9be8-6724c5e34c99", json_blueprint)
+        print(_path)
+        assert Path(_path).exists()

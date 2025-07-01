@@ -1,13 +1,13 @@
 {
 	"TEMPLATE_INFO": {
 		"NAME": "Default-table",
-		"VERSION": "Template Wizard XXXX-XX-XX",
+		"VERSION": "Template Designer XXXX-XX-XX",
 		"TYPE": 1,
 		"ALLOW_QUALIFIER_IN_VALUE_CELL": 1
 	},
 	"DATA_ACCESS": {
 		"SHEET_NAME": "Result_TABLE",
-		"START_ROW": 2,
+		"START_ROW": 3,
 		"START_HEADER_ROW": 1,
 		"SHEET_INDEX": 2,
 		"ALLOW_EMPTY": true,
@@ -17,7 +17,7 @@
 	"SUBSTANCE_RECORD": {
 		"PUBLIC_NAME": {
 				"SHEET_INDEX": 2,
-				"COLUMN_INDEX": "B"				
+				"COLUMN_INDEX": "A"				
 		},
 		"OWNER_NAME": {
 			"ITERATION": "ABSOLUTE_LOCATION",
@@ -27,7 +27,7 @@
 		},
 		"SUBSTANCE_NAME": {
 				"SHEET_INDEX": 2,
-				"COLUMN_INDEX": "B"			
+				"COLUMN_INDEX": "A"			
 		}
 	},	
 	"PROTOCOL_APPLICATIONS": [
@@ -54,7 +54,7 @@
 			"INVESTIGATION_UUID" : {
 				"ITERATION": "ABSOLUTE_LOCATION",
 				"SHEET_INDEX": 1,
-				"COLUMN_INDEX": "G",
+				"COLUMN_INDEX": "F",
 				"ROW_INDEX": 8				
 			},
 			"CITATION_TITLE": {

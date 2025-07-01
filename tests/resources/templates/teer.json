@@ -1,1 +1,345 @@
-{"newtemplate":"create_new","PROTOCOL_TOP_CATEGORY":"TOX","pageNo":0,"user_role":["role_lab"],"templates":"c5dd3ac9-9340-44b0-9be8-6724c5e34c99","METHOD":"TEER","EXPERIMENT":"barier integrity","conditions":[{"conditon_name":"time","condition_unit":"h","condition_type":"c_time"},{"conditon_name":"concentration","condition_unit":"ug/ml","condition_type":"c_concentration"},{"conditon_name":"Replicate","condition_type":"c_replicate_tech"},{"conditon_name":"Experiment","condition_type":"c_replicate_bio"}],"PROTOCOL_CATEGORY_CODE":"ENM_0000044_SECTION","data_sheets":["data_raw","data_processed"],"RESULTS":"Ohms.Area\nbarier integrity\n","raw_data_report":[{"raw_conditions":["concentration","time","Experiment","Replicate","Passage"],"raw_endpoint":"RESISTANCE","raw_aggregate":"RAW_DATA","raw_unit":"Ω","raw_type":"value_num"},{"raw_conditions":["time","concentration","Replicate","Experiment"],"raw_endpoint":"RESISTANCE with subtracted blank values","raw_unit":"Ω","raw_type":"value_num"},{"raw_conditions":["Experiment","Replicate","concentration","time"],"raw_endpoint":"TEER","raw_aggregate":"RAW_DATA","raw_unit":"Ω•cm2","raw_type":"value_num"}],"question3":[{"results_conditions":["concentration","time","Experiment"],"result_name":"TEER  (replicate average)","result_aggregate":"MEAN","result_unit":"Ω•cm2","result_type":"value_num"},{"results_conditions":["concentration","time"],"result_name":"TEER","result_unit":"Ω•cm2","result_endpoint_uncertainty":"SD","result_type":"value_num"}],"METADATA_PARAMETERS":[{"param_name":"Detailed cell type/line specification","param_group":"CELL LINE DETAILS","param_type":"value_text"},{"param_name":"Cell line short-name","param_group":"CELL LINE DETAILS","param_type":"value_text"},{"param_name":"Cell line Supplier","param_group":"CELL LINE DETAILS","param_type":"value_text"},{"param_hint":"DMEM","param_name":"Cell culture medium composition in lower compartment","param_group":"CULTURE CONDITIONS","param_type":"value_text ","param_subgroup":"Cell culture medium"},{"param_subgroup":"Cell culture medium","param_name":"Serum concentration in culture medium in lower compartment","param_group":"CULTURE CONDITIONS","param_type":"value_num"},{"param_subgroup":"Cell culture medium","param_name":"Volume of  cell culture medium in lower compartment","param_group":"CULTURE CONDITIONS","param_type":"value_num"},{"param_subgroup":"Cell culture medium","param_hint":"air liquid interface OR submerged (to be chosen)","param_name":"Cell culture conditions","param_group":"CULTURE CONDITIONS","param_type":"value_text"},{"param_subgroup":"Cell culture medium","param_hint":"applicable only if submerged conditions were chosen","param_name":"Cell culture medium composition in upper compartment","param_group":"CULTURE CONDITIONS","param_type":"value_text"},{"param_subgroup":"Cell culture medium","param_hint":"applicable only if submerged conditions were chosen","param_name":"Serum concentration in culture medium in upper compartment","param_group":"CULTURE CONDITIONS","param_type":"value_num"},{"param_subgroup":"Cell culture medium","param_hint":"applicable only if submerged conditions were chosen","param_name":"Volume of  cell culture medium in upper compartment","param_group":"CULTURE CONDITIONS","param_type":"value_num"},{"param_name":"Was serum heat inactivated","param_group":"MEDIUM","param_type":"value_boolean"},{"param_subgroup":"Plate","param_name":"Plate details","param_group":"MEASUREMENT CONDITIONS","param_type":"value_text","param_hint":"24-well"},{"param_subgroup":"Plate","param_hint":"24-well","param_name":"Plate Make / type","param_group":"MEASUREMENT CONDITIONS","param_type":"value_text"},{"param_hint":"(pore size, material) ","param_subgroup":"culture inserts","param_name":"Type and supplier of cell culture inserts","param_group":"MEASUREMENT CONDITIONS","param_type":"value_text"},{"param_subgroup":"culture inserts","param_name":"Area of cell culture insert","param_unit":"cm2","param_group":"MEASUREMENT CONDITIONS","param_type":"value_num"},{"param_name":"TEER measurement device","param_group":"INSTRUMENT","param_type":"value_text","param_hint":"EVOM 3"},{"param_name":"TEER measurement mode","param_group":"INSTRUMENT","param_type":"value_text"},{"param_name":"Temperature during TEER measurement","param_group":"INSTRUMENT","param_type":"value_num"},{"param_name":"Medium composition during TEER measurement","param_group":"INSTRUMENT","param_type":"value_text"}],"METADATA_SAMPLE_INFO":[{"param_sample_name":"ID","param_sample_group":"ID"},{"param_sample_name":"Name","param_sample_group":"NAME"},{"param_sample_name":"CAS No","param_sample_group":"CASRN"},{"param_sample_name":"Material Supplier","param_sample_group":"SUPPLIER"},{"param_sample_name":"Material State","param_sample_group":"OTHER_METADATA"},{"param_sample_name":"Batch","param_sample_group":"BATCH"},{"param_sample_name":"Vial","param_sample_group":"BATCH"}],"METADATA_SAMPLE_PREP":[{"param_sampleprep_name":"Date of preparation","param_sampleprep_group":"OTHER_SAMPLEPREP","param_type":"value_date"},{"param_sampleprep_name":"Endotoxin confirmed as absent?","param_sampleprep_group":"OTHER_METADATA","param_type":"value_boolean"},{"param_sampleprep_name":"Effective concentration range","param_sampleprep_group":"OTHER_METADATA","param_type":"value_num"},{"param_sampleprep_name":"Dispersion protocol","param_sampleprep_group":"DISPERSION","param_type":"value_text"},{"param_sampleprep_name":"Dispersion agent","param_sampleprep_group":"DISPERSION","param_type":"value_text "},{"param_sampleprep_name":" Additives used","param_sampleprep_group":"DISPERSION","param_type":"value_boolean"},{"param_sampleprep_name":"Dispersed in cell culture medium","param_sampleprep_group":"DISPERSION","param_type":"value_text"},{"param_sampleprep_name":"Aids used to disperse","param_sampleprep_group":"DISPERSION","param_type":"value_boolean","param_sampleprep_subgroup":"Aids used to disperse"},{"param_sampleprep_subgroup":"Aids used to disperse","param_sampleprep_name":"Sonication-Bath","param_sampleprep_group":"DISPERSION","param_type":"value_text"},{"param_sampleprep_hint":"Yes","param_sampleprep_subgroup":"Aids used to disperse","param_sampleprep_name":"Sonication-tip","param_sampleprep_group":"DISPERSION","param_type":"value_text"},{"param_sampleprep_hint":"Yes","param_sampleprep_subgroup":"Aids used to disperse","param_sampleprep_name":"Vortexing","param_sampleprep_group":"DISPERSION","param_type":"value_boolean"},{"param_sampleprep_subgroup":"Aids used to disperse","param_sampleprep_name":"Stirring","param_sampleprep_group":"DISPERSION","param_type":"value_boolean"},{"param_sampleprep_hint":"16 min","param_sampleprep_name":"Specify time-duration","param_sampleprep_group":"DISPERSION","param_type":"value_num","param_sampleprep_subgroup":"Aids used to disperse"},{"param_sampleprep_subgroup":"Aids used to disperse","param_sampleprep_name":"Energy (for sonication)","param_sampleprep_group":"DISPERSION","param_type":"value_num"}],"template_author":"Neža Repar, Sara Michelini","template_name":"TEER (ALI or submerged)","template_acknowledgment":"PLASTICFATE","SOP":"protocol_research","EXPERIMENT_PROTOCOL":"barier integrity\n","controls":["c_control_positive","c_control_negative","c_control_blank"],"plate_format":"96","template_layout":"dose_response","template_author_orcid":"c67e6db2-0551-4d85-99dc-d55c8ecd48f8","template_status":"DRAFT","origin_uuid":"c67e6db2-0551-4d85-99dc-d55c8ecd48f8","question3-Comment":"Triton X100 positive control\nnegative control Replicate of blank values (cell inserts without cells)","provenance_project":"PLASTICFATE"}
+{
+    "newtemplate": "create_new",
+    "PROTOCOL_TOP_CATEGORY": "TOX",
+    "pageNo": 0,
+    "user_role": [
+        "role_lab"
+    ],
+    "templates": "c5dd3ac9-9340-44b0-9be8-6724c5e34c99",
+    "METHOD": "TEER",
+    "EXPERIMENT": "barier integrity",
+    "conditions": [
+        {
+            "conditon_name": "time",
+            "condition_unit": "h",
+            "condition_type": "c_time"
+        },
+        {
+            "conditon_name": "concentration",
+            "condition_unit": "ug/ml",
+            "condition_type": "c_concentration"
+        },
+        {
+            "conditon_name": "Replicate",
+            "condition_type": "c_replicate_tech"
+        },
+        {
+            "conditon_name": "Experiment",
+            "condition_type": "c_replicate_bio"
+        }
+    ],
+    "PROTOCOL_CATEGORY_CODE": "ENM_0000044_SECTION",
+    "data_sheets": [
+        "data_raw",
+        "data_processed"
+    ],
+    "RESULTS": "Ohms.Area\nbarier integrity\n",
+    "raw_data_report": [
+        {
+            "raw_conditions": [
+                "concentration",
+                "time",
+                "Experiment",
+                "Replicate",
+                "Passage"
+            ],
+            "raw_endpoint": "RESISTANCE",
+            "raw_aggregate": "RAW_DATA",
+            "raw_unit": "Ω",
+            "raw_type": "value_num"
+        },
+        {
+            "raw_conditions": [
+                "time",
+                "concentration",
+                "Replicate",
+                "Experiment"
+            ],
+            "raw_endpoint": "RESISTANCE with subtracted blank values",
+            "raw_unit": "Ω",
+            "raw_type": "value_num"
+        },
+        {
+            "raw_conditions": [
+                "Experiment",
+                "Replicate",
+                "concentration",
+                "time"
+            ],
+            "raw_endpoint": "TEER",
+            "raw_aggregate": "RAW_DATA",
+            "raw_unit": "Ω•cm2",
+            "raw_type": "value_num"
+        }
+    ],
+    "question3": [
+        {
+            "results_conditions": [
+                "concentration",
+                "time",
+                "Experiment"
+            ],
+            "result_name": "TEER  (replicate average)",
+            "result_aggregate": "MEAN",
+            "result_unit": "Ω•cm2",
+            "result_type": "value_num"
+        },
+        {
+            "results_conditions": [
+                "concentration",
+                "time"
+            ],
+            "result_name": "TEER",
+            "result_unit": "Ω•cm2",
+            "result_endpoint_uncertainty": "SD",
+            "result_type": "value_num"
+        }
+    ],
+    "METADATA_PARAMETERS": [
+        {
+            "param_name": "Detailed cell type/line specification",
+            "param_group": "CELL LINE DETAILS",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Cell line short-name",
+            "param_group": "CELL LINE DETAILS",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Cell line Supplier",
+            "param_group": "CELL LINE DETAILS",
+            "param_type": "value_text"
+        },
+        {
+            "param_hint": "DMEM",
+            "param_name": "Cell culture medium composition in lower compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_text ",
+            "param_subgroup": "Cell culture medium"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_name": "Serum concentration in culture medium in lower compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_name": "Volume of  cell culture medium in lower compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_hint": "air liquid interface OR submerged (to be chosen)",
+            "param_name": "Cell culture conditions",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_text"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_hint": "applicable only if submerged conditions were chosen",
+            "param_name": "Cell culture medium composition in upper compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_text"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_hint": "applicable only if submerged conditions were chosen",
+            "param_name": "Serum concentration in culture medium in upper compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_subgroup": "Cell culture medium",
+            "param_hint": "applicable only if submerged conditions were chosen",
+            "param_name": "Volume of  cell culture medium in upper compartment",
+            "param_group": "CULTURE CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_name": "Was serum heat inactivated",
+            "param_group": "MEDIUM",
+            "param_type": "value_boolean"
+        },
+        {
+            "param_subgroup": "Plate",
+            "param_name": "Plate details",
+            "param_group": "MEASUREMENT CONDITIONS",
+            "param_type": "value_text",
+            "param_hint": "24-well"
+        },
+        {
+            "param_subgroup": "Plate",
+            "param_hint": "24-well",
+            "param_name": "Plate Make / type",
+            "param_group": "MEASUREMENT CONDITIONS",
+            "param_type": "value_text"
+        },
+        {
+            "param_hint": "(pore size, material) ",
+            "param_subgroup": "culture inserts",
+            "param_name": "Type and supplier of cell culture inserts",
+            "param_group": "MEASUREMENT CONDITIONS",
+            "param_type": "value_text"
+        },
+        {
+            "param_subgroup": "culture inserts",
+            "param_name": "Area of cell culture insert",
+            "param_unit": "cm2",
+            "param_group": "MEASUREMENT CONDITIONS",
+            "param_type": "value_num"
+        },
+        {
+            "param_name": "TEER measurement device",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_text",
+            "param_hint": "EVOM 3"
+        },
+        {
+            "param_name": "TEER measurement mode",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_text"
+        },
+        {
+            "param_name": "Temperature during TEER measurement",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_num"
+        },
+        {
+            "param_name": "Medium composition during TEER measurement",
+            "param_group": "INSTRUMENT",
+            "param_type": "value_text"
+        }
+    ],
+    "METADATA_SAMPLE_INFO": [
+        {
+            "param_sample_name": "ID",
+            "param_sample_group": "ID"
+        },
+        {
+            "param_sample_name": "Name",
+            "param_sample_group": "NAME"
+        },
+        {
+            "param_sample_name": "CAS No",
+            "param_sample_group": "CASRN"
+        },
+        {
+            "param_sample_name": "Material Supplier",
+            "param_sample_group": "SUPPLIER"
+        },
+        {
+            "param_sample_name": "Material State",
+            "param_sample_group": "OTHER_METADATA"
+        },
+        {
+            "param_sample_name": "Batch",
+            "param_sample_group": "BATCH"
+        },
+        {
+            "param_sample_name": "Vial",
+            "param_sample_group": "BATCH"
+        }
+    ],
+    "METADATA_SAMPLE_PREP": [
+        {
+            "param_sampleprep_name": "Date of preparation",
+            "param_sampleprep_group": "OTHER_SAMPLEPREP",
+            "param_type": "value_date"
+        },
+        {
+            "param_sampleprep_name": "Endotoxin confirmed as absent?",
+            "param_sampleprep_group": "OTHER_METADATA",
+            "param_type": "value_boolean"
+        },
+        {
+            "param_sampleprep_name": "Effective concentration range",
+            "param_sampleprep_group": "OTHER_METADATA",
+            "param_type": "value_num"
+        },
+        {
+            "param_sampleprep_name": "Dispersion protocol",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_text"
+        },
+        {
+            "param_sampleprep_name": "Dispersion agent",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_text "
+        },
+        {
+            "param_sampleprep_name": " Additives used",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_boolean"
+        },
+        {
+            "param_sampleprep_name": "Dispersed in cell culture medium",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_text"
+        },
+        {
+            "param_sampleprep_name": "Aids used to disperse",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_boolean",
+            "param_sampleprep_subgroup": "Aids used to disperse"
+        },
+        {
+            "param_sampleprep_subgroup": "Aids used to disperse",
+            "param_sampleprep_name": "Sonication-Bath",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_text"
+        },
+        {
+            "param_sampleprep_hint": "Yes",
+            "param_sampleprep_subgroup": "Aids used to disperse",
+            "param_sampleprep_name": "Sonication-tip",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_text"
+        },
+        {
+            "param_sampleprep_hint": "Yes",
+            "param_sampleprep_subgroup": "Aids used to disperse",
+            "param_sampleprep_name": "Vortexing",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_boolean"
+        },
+        {
+            "param_sampleprep_subgroup": "Aids used to disperse",
+            "param_sampleprep_name": "Stirring",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_boolean"
+        },
+        {
+            "param_sampleprep_hint": "16 min",
+            "param_sampleprep_name": "Specify time-duration",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_num",
+            "param_sampleprep_subgroup": "Aids used to disperse"
+        },
+        {
+            "param_sampleprep_subgroup": "Aids used to disperse",
+            "param_sampleprep_name": "Energy (for sonication)",
+            "param_sampleprep_group": "DISPERSION",
+            "param_type": "value_num"
+        }
+    ],
+    "template_author": "Neža Repar, Sara Michelini",
+    "template_name": "TEER (ALI or submerged)",
+    "template_acknowledgment": "PLASTICFATE",
+    "SOP": "protocol_research",
+    "EXPERIMENT_PROTOCOL": "barier integrity\n",
+    "controls": [
+        "c_control_positive",
+        "c_control_negative",
+        "c_control_blank"
+    ],
+    "plate_format": "96",
+    "template_layout": "dose_response",
+    "template_author_orcid": "c67e6db2-0551-4d85-99dc-d55c8ecd48f8",
+    "template_status": "DRAFT",
+    "origin_uuid": "c67e6db2-0551-4d85-99dc-d55c8ecd48f8",
+    "question3-Comment": "Triton X100 positive control\nnegative control Replicate of blank values (cell inserts without cells)",
+    "provenance_project": "PLASTICFATE"
+}
