@@ -1,11 +1,9 @@
-import json
-import pyambit.datamodel as mx
 import pandas as pd
-import os
 import re
 from typing import IO
 from openpyxl.utils import get_column_letter
-import numpy as np
+import ast
+import json
 
 
 class TemplateDesignerConfig:
@@ -20,7 +18,7 @@ class TemplateDesignerConfig:
         _data_sheets = self.template_json["data_sheets"]    
         if "data_raw" in _data_sheets:
             self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1]) 
-        else: 
+        else:
             self.raw = None
         if "data_processed" in _data_sheets:
             self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
@@ -62,7 +60,17 @@ class TemplateDesignerConfig:
         #template["json"] = template_df.iloc[0]["surveyjs"]
         #assert template_df.iloc[1]["uuid"] == "version"
         #template["version"] = template_df.iloc[1]["surveyjs"]
-        return json.loads(template_df.iloc[0]["surveyjs"])
+        _json = template_df.iloc[0]["surveyjs"]
+        try:
+            return json.loads(_json)
+        except Exception as err:
+            print(err)
+            data = ast.literal_eval(_json)
+            good_json_str = json.dumps(data, ensure_ascii=False, indent=2)
+            #good_json_str = _json.replace("'", '"')
+            return json.loads(good_json_str)
+
+
         
     def _get_rows_from_match(self, df, search_text, n_rows=1, start_col="B"):
         """
