@@ -5,6 +5,7 @@ import os
 import re
 from typing import IO
 from openpyxl.utils import get_column_letter
+import numpy as np
 
 
 class TemplateDesignerParser:
@@ -106,7 +107,7 @@ class TemplateDesignerParser:
 
     def get_materials_used(self):
         return self._get_rows_from_match(self.test_conditions, "Select item from Project Materials list", n_rows=1)
-    
+
     def get_protocol_application(self):
         # Define Protocol from template metadata
         protocol = mx.Protocol(
@@ -117,12 +118,12 @@ class TemplateDesignerParser:
         pa = mx.ProtocolApplication(protocol=protocol, effects=[])
         pa.parameters = self.get_parameters()
         return pa
-    
+
     def get_condition_df(self):
         df = pd.DataFrame(self.template_json["conditions"])
         df = df.rename(columns=lambda x: x.replace("condition_", "", 1))
         return df.rename(columns=lambda x: x.replace("conditon_", "", 1))
-    
+
     def get_parameters(self):
         params = {}
         # 5. Add metadata parameters
@@ -143,6 +144,106 @@ class TemplateDesignerParser:
                     _val, _unit = self.parse_value_unit(value, p_unit)
                     params[f"{p_group}/{p_name}"]  = mx.Value(loValue=_val, unit=_unit)
         return params
+
+    def df_to_nd_effectarray_multicol(
+        self,
+        df: pd.DataFrame,
+        axes_names: list,
+        main_signal: str,
+        aux_signals: list = None,
+        endpoint: str = None,
+        endpointtype: str = None,
+        unit: str = 'counts'
+    ):
+        """
+        Build an nD EffectArray from a DataFrame with MultiIndex columns.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            MultiIndex columns: (endpoint, unit)
+        axes_names : list
+            Names of columns to use as axes
+        main_signal : str
+            Name of main signal (level 0 of MultiIndex)
+        aux_signals : list, optional
+            Names of auxiliary signals (level 0 of MultiIndex)
+        endpoint : str, optional
+            Name of EffectArray endpoint (default = main_signal)
+        endpointtype : str, optional
+            Type of endpoint
+        unit : str
+            Unit for signals
+
+        Returns
+        -------
+        EffectArray
+        """
+
+        # --- Detect actual columns in MultiIndex ---
+        def pick_column(df, name):
+            """
+            Return the first matching column tuple for level 0 == name.
+            Returns None if column not found.
+            """
+            for c in df.columns:
+                if isinstance(c, tuple) and c[0] == name:
+                    return c
+                elif c == name:
+                    return c
+            return None  # skip missing columns
+
+        axis_cols = {ax: col for ax, col in ((ax, pick_column(df, ax)) for ax in axes_names) if col is not None}
+        main_col = pick_column(df, main_signal)
+        if main_col is None:
+            raise ValueError(f"Main signal column '{main_signal}' not found in DataFrame")        
+        # Filter auxiliary signals: include only those that exist
+        aux_cols = {aux: col for aux, col in ((aux, pick_column(df, aux)) for aux in (aux_signals or [])) if col is not None}
+
+        # --- Build axes ValueArrays dynamically ---
+        axes_dict = {}
+        for ax, col in axis_cols.items():
+            values = pd.unique(df[col])
+            axes_dict[ax] = mx.ValueArray(values=values, unit='tbd')
+
+        # --- Prepare nD shape ---
+        axes_list = list(axes_dict.keys())
+        shape = tuple(len(axes_dict[ax].values) for ax in axes_list)
+
+        # Build index maps
+        idx_map = {ax: {val: i for i, val in enumerate(axes_dict[ax].values)} for ax in axes_list}
+
+        # --- Initialize main signal and auxiliary matrices ---
+        signal_matrix = np.full(shape, np.nan)
+        aux_matrices = {name: np.full(shape, np.nan) for name in aux_cols}
+
+        # --- Fill matrices ---
+        for _, row in df.iterrows():
+            idx = tuple(idx_map[ax][row[axis_cols[ax]]] for ax in axes_list)
+            signal_matrix[idx] = row[main_col]
+            for aux_name, aux_col in aux_cols.items():
+                aux_matrices[aux_name][idx] = row[aux_col]
+
+        # --- Build auxiliary ValueArrays ---
+        auxiliary = {k: mx.ValueArray(values=v, unit=unit) for k, v in aux_matrices.items()} if aux_matrices else None
+
+        # --- Build main signal ValueArray ---
+        signal_va = mx.ValueArray(
+            values=signal_matrix,
+            unit=unit,
+            auxiliary=auxiliary
+        )
+
+        # --- Build EffectArray ---
+        earray = mx.EffectArray(
+            endpoint=endpoint or main_signal,
+            endpointtype=endpointtype,
+            conditions={},
+            signal=signal_va,
+            axes=axes_dict,
+            axis_groups=None
+        )
+        return earray
 
     def parse(self) -> mx.Substances:
         _data_sheets = self.template_json["data_sheets"]    
@@ -165,6 +266,8 @@ class TemplateDesignerParser:
                 else:
                     if pd.notna(value):
                         print(f"Row {index}, {name} [{_unit}] = {value}")
+
+                                                
         return data, endpoints_df
 
     def parse_raw_data(self):
