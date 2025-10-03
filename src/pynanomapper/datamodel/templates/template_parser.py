@@ -15,7 +15,20 @@ class TemplateDesignerParser:
         tc = pd.read_excel(xlsx_file, sheet_name="Test_conditions", header=None)
         tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
         self.test_conditions = tc
-        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials")    
+        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials") 
+        _data_sheets = self.template_json["data_sheets"]    
+        if "data_raw" in _data_sheets:
+            self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1]) 
+        else: 
+            self.raw = None
+        if "data_processed" in _data_sheets:
+            self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
+        else:
+            self.results = None
+        if "data_calibration" in _data_sheets:
+            self.calibration = pd.read_excel(xlsx_file, sheet_name="Calibration_TABLE", header=[0,1])
+        else:
+            self.calibration = None
 
     def parse_value_unit(self, s, unit=None):
         """
@@ -105,6 +118,11 @@ class TemplateDesignerParser:
         pa.parameters = self.get_parameters()
         return pa
     
+    def get_condition_df(self):
+        df = pd.DataFrame(self.template_json["conditions"])
+        df = df.rename(columns=lambda x: x.replace("condition_", "", 1))
+        return df.rename(columns=lambda x: x.replace("conditon_", "", 1))
+    
     def get_parameters(self):
         params = {}
         # 5. Add metadata parameters
@@ -126,5 +144,46 @@ class TemplateDesignerParser:
                     params[f"{p_group}/{p_name}"]  = mx.Value(loValue=_val, unit=_unit)
         return params
 
-    def parse(self, xlsx_file: IO) -> mx.Substances:
+    def parse(self) -> mx.Substances:
+        _data_sheets = self.template_json["data_sheets"]    
+        if "data_raw" in _data_sheets:
+            self.parse_raw_data()
+        if "data_processed" in _data_sheets:
+            self.parse_processed_data()
+        if "data_calibration" in _data_sheets:
+            self.parse_calibration()
+
+    def _parse_data(self, data=None, endpoints_df=None):
+        if data is None:
+            return
+        for index, row in data.iterrows():
+            for (name, unit) in data.columns:
+                value = row[(name, unit)]   # <-- this gives the cell value
+                _unit = None if unit.startswith("Unnamed") else unit
+                if name == "Material":
+                    print(value)
+                else:
+                    if pd.notna(value):
+                        print(f"Row {index}, {name} [{_unit}] = {value}")
+        return data, endpoints_df
+
+    def parse_raw_data(self):
+        if self.raw is None:
+            return None, None
+        else:
+            df = pd.DataFrame(self.template_json["raw_data_report"])
+            df = df.rename(columns=lambda x: x.replace("raw_", "", 1))
+            df = df.rename(columns={"endpoint": "name"})
+            return self._parse_data(self.raw, df)
+
+    def parse_processed_data(self):
+        if self.results is None:
+            return None, None
+        else:
+            df = pd.DataFrame(self.template_json["question3"])
+            df = df.rename(columns=lambda x: x.replace("result_", "", 1))
+            df = df.rename(columns=lambda x: x.replace("results_", "", 1))
+            return self._parse_data(self.results, df)
+
+    def parse_calibration(self):
         pass
