@@ -6,7 +6,7 @@ import re
 from typing import IO
 from openpyxl.utils import get_column_letter
 import numpy as np
-from template_config import TemplateDesignerConfig
+from pynanomapper.datamodel.templates.template_config import TemplateDesignerConfig
 
 
 class TemplateDesignerParser(TemplateDesignerConfig):
@@ -14,6 +14,7 @@ class TemplateDesignerParser(TemplateDesignerConfig):
 
     def __init__(self, xlsx_file: IO):
         self.template_json = self.parse_hidden(xlsx_file)
+        
         tc = pd.read_excel(xlsx_file, sheet_name="Test_conditions", header=None)
         tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
         self.test_conditions = tc
@@ -32,6 +33,7 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         else:
             self.calibration = None
 
+   
     def parse_value_unit(self, s, unit=None):
         """
         Parses a string with a numeric value followed by a unit.
@@ -360,10 +362,13 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         return effects
     
     def get_config(self):
-        config = {}
-        config["PROTOCOL_APPLICATIONS"] = []
-        config["PROTOCOL_APPLICATIONS"].append(self.get_config_papp())
-        return config
+        if self.get_layout() == "dose_response":
+            config = {}
+            config["PROTOCOL_APPLICATIONS"] = []
+            config["PROTOCOL_APPLICATIONS"].append(self.get_config_papp())
+            return config
+        else:
+            raise Exception("Not implemented")
 
     def get_config_params(self):
         config = {}

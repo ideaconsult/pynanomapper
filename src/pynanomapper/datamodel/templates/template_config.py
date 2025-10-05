@@ -4,31 +4,50 @@ from typing import IO
 from openpyxl.utils import get_column_letter
 import ast
 import json
+from pathlib import Path
 
 
 class TemplateDesignerConfig:
     """Parser to convert TemplateDesigner Excel files into AMBIT data model objects."""
 
-    def __init__(self, xlsx_file: IO):
+    def __init__(self, xlsx_file: Path):
+        self.template_file_name = xlsx_file
         self.template_json = self.parse_hidden(xlsx_file)
-        tc = pd.read_excel(xlsx_file, sheet_name="Test_conditions", header=None)
-        tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
-        self.test_conditions = tc
-        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials") 
-        _data_sheets = self.template_json["data_sheets"]    
-        if "data_raw" in _data_sheets:
-            self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1]) 
+        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials")
+        if self.get_layout() == "dose_response":
+            tc = pd.read_excel(xlsx_file, sheet_name="Test_conditions", header=None)
+            tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
+            self.test_conditions = tc
+            _data_sheets = self.template_json["data_sheets"]    
+            if "data_raw" in _data_sheets:
+                self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1]) 
+            else:
+                self.raw = None
+            if "data_processed" in _data_sheets:
+                self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
+            else:
+                self.results = None
+            if "data_calibration" in _data_sheets:
+                self.calibration = pd.read_excel(xlsx_file, sheet_name="Calibration_TABLE", header=[0,1])
+            else:
+                self.calibration = None
         else:
-            self.raw = None
-        if "data_processed" in _data_sheets:
-            self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
-        else:
-            self.results = None
-        if "data_calibration" in _data_sheets:
-            self.calibration = pd.read_excel(xlsx_file, sheet_name="Calibration_TABLE", header=[0,1])
-        else:
-            self.calibration = None
+            tmp = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=None)
+            self.results = tmp.iloc[4:]
+            new_header = [tmp.iloc[0, 0]] + [tmp.iloc[0, 1]] + tmp.iloc[1, 2:].tolist()
+            self.results.columns = new_header            
+            tmp = pd.read_excel(xlsx_file, sheet_name="Experimental_setup", header=None)
+            self.test_conditions = tmp.iloc[4:]
+            new_header = [tmp.iloc[0, 0]] + tmp.iloc[2, 1:].tolist()
+            self.test_conditions.columns = new_header
+            self.provider_info = pd.read_excel(xlsx_file, sheet_name="Provider_informations", header=None)
 
+    def get_method(self):
+        return self.template_json["METHOD"]
+    
+    def get_layout(self):
+        return self.template_json["template_layout"]
+    
     def parse_value_unit(self, s, unit=None):
         """
         Parses a string with a numeric value followed by a unit.
@@ -111,7 +130,10 @@ class TemplateDesignerConfig:
         return subset_df
 
     def get_materials_used(self):
-        return self._get_rows_from_match(self.test_conditions, "Select item from Project Materials list", n_rows=1)
+        if self.get_layout() == "dose_response":
+            return self._get_rows_from_match(self.test_conditions, "Select item from Project Materials list", n_rows=1)
+        else:
+            raise Exception('Not implemented')
 
     def _add_excel_col_letters(self, c_df: pd.DataFrame, cols_array, col_letter="col_letter") -> pd.DataFrame:
         """
@@ -142,14 +164,18 @@ class TemplateDesignerConfig:
         return c_df
 
     def get_condition_df(self):
-        df = pd.DataFrame(self.template_json["conditions"])
-        df = df.rename(columns=lambda x: x.replace("condition_", "", 1))
-        df = df.rename(columns=lambda x: x.replace("conditon_", "", 1))
-        if self.results is not None:
-            df = self._add_excel_col_letters(df, self.results.columns, col_letter="results_pos")
-        if self.raw is not None:            
-            df = self._add_excel_col_letters(df, self.raw.columns, col_letter="raw_pos")
-        return df
+        conditions = self.template_json.get("conditions", None)
+        if conditions is not None:
+            df = pd.DataFrame(conditions)
+            df = df.rename(columns=lambda x: x.replace("condition_", "", 1))
+            df = df.rename(columns=lambda x: x.replace("conditon_", "", 1))
+            if self.results is not None:
+                df = self._add_excel_col_letters(df, self.results.columns, col_letter="results_pos")
+            if self.raw is not None:            
+                df = self._add_excel_col_letters(df, self.raw.columns, col_letter="raw_pos")
+            return df
+        else:
+            return None
 
     # --- Detect actual columns in MultiIndex safely ---
     def pick_column(self, df, name):
@@ -216,7 +242,6 @@ class TemplateDesignerConfig:
             "template_layout": self.template_json["template_layout"]
             }
         }
-
         config["DATA_ACCESS"] = {
             "ITERATION": "ROW_SINGLE",
             "SHEET_INDEX": 2,
@@ -235,9 +260,13 @@ class TemplateDesignerConfig:
                 "COLUMN_INDEX": "A"
             }
         }
-        config["PROTOCOL_APPLICATIONS"] = []
-        config["PROTOCOL_APPLICATIONS"].append(self.get_config_papp())
-        return config
+        config["PROTOCOL_APPLICATIONS"] = []        
+        if self.get_layout() == "dose_response":
+            config["PROTOCOL_APPLICATIONS"].append(self.get_config_papp())
+            return config
+        else:
+            raise Exception("Not implemented")        
+        
 
     def get_config_params(self):
         config = {"E.Method" : {"ITERATION": "ABSOLUTE_LOCATION", "SHEET_INDEX": 1,
