@@ -47,7 +47,7 @@ jobs:
       - name: Build the package distributions
         run: poetry build --no-interaction
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: pynanomapper-dist
           path: dist
