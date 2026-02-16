@@ -73,23 +73,6 @@ class TemplateDesignerConfig:
             # Could not parse, return original string as unitless value
             return s, unit
         
-    def parse_hidden(self, xlsx_file: IO):
-        template_df = pd.read_excel(xlsx_file, sheet_name="TemplateDesigner")
-        #template["uuid"] = template_df.iloc[0]["uuid"]
-        #template["json"] = template_df.iloc[0]["surveyjs"]
-        #assert template_df.iloc[1]["uuid"] == "version"
-        #template["version"] = template_df.iloc[1]["surveyjs"]
-        _json = template_df.iloc[0]["surveyjs"]
-        try:
-            return json.loads(_json)
-        except Exception as err:
-            print(err)
-            data = ast.literal_eval(_json)
-            good_json_str = json.dumps(data, ensure_ascii=False, indent=2)
-            #good_json_str = _json.replace("'", '"')
-            return json.loads(good_json_str)
-
-
         
     def _get_rows_from_match(self, df, search_text, n_rows=1, start_col="B"):
         """
@@ -266,7 +249,6 @@ class TemplateDesignerConfig:
             return config
         else:
             raise Exception("Not implemented")        
-        
 
     def get_config_params(self):
         config = {"E.Method" : {"ITERATION": "ABSOLUTE_LOCATION", "SHEET_INDEX": 1,
@@ -352,8 +334,18 @@ class TemplateDesignerConfig:
                 sheet_name="Results_TABLE")
         effects_raw.extend(effects_result)
         return effects_raw
-
-
+        
+    def parse_hidden(self, xlsx_file: IO):
+        template_df = pd.read_excel(xlsx_file, sheet_name="TemplateDesigner")
+        _json = template_df.iloc[0]["surveyjs"]
+        try:
+            return json.loads(_json.replace("'", "\""))
+        except Exception as err:
+            # Handle legacy files with single quotes instead of double quotes
+            print(f"JSON parsing failed, trying ast.literal_eval: {err}")
+            data = ast.literal_eval(_json)
+            good_json_str = json.dumps(data, ensure_ascii=False, indent=2)
+            return json.loads(good_json_str)
 
     def parse_calibration(self):
         return None
