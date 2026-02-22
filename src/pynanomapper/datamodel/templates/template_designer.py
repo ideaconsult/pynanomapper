@@ -1853,10 +1853,10 @@ survey_js = {
             "navigationTitle": "7. Layout",
             "navigationDescription": "Select the most appropriate Excel layout",
         },
-    {
+{
     "name": "page_ontology",
     "title": "[{template_name}]: Ontology Mapping",
-    "description": "Map the free-text names defined in earlier pages to ontology terms. This information will be stored as a dedicated sheet in the generated Excel template and used to annotate the resulting data file. Mapping is optional for DRAFT blueprints and recommended before finalization.",
+    "description": "Map free-text names from this blueprint to ontology terms. Use the search panel to find a term in OLS, then add it to the mapping table.",
     "navigationTitle": "8. Ontology",
     "navigationDescription": "Map endpoints, parameters and units to ontology terms",
     "elements": [
@@ -1865,655 +1865,275 @@ survey_js = {
             "type": "html",
             "name": "help_ontology_intro",
             "titleLocation": "hidden",
-            "html": "<div class='alert alert-info'><b>How to use this page:</b> Each section below corresponds to a set of named fields you defined earlier in the blueprint. For each row, select the name from the dropdown (populated from your earlier entries), then enter the matching ontology term label, term ID (as a CURIE, e.g. <code>BAO:0002434</code>), and the ontology source. Use <a href='https://www.ebi.ac.uk/ols4' target='_blank'>EMBL-EBI OLS</a> or <a href='https://bioportal.bioontology.org' target='_blank'>BioPortal</a> to look up terms. You do not need to map every field &mdash; map what you can.</div>",
+            "html": "<div class='alert alert-info'><b>How to use:</b> (1) Select the <b>source type</b> and the <b>name</b> you want to map. (2) Select an <b>ontology</b> and type a search term. (3) Select a result from the dropdown. (4) Click <b>Add to mapping</b>. The mapping table below is what will be exported as the ontology sheet in the generated Excel file and used to annotate the NeXus output. You do not need to map every field.</div>",
             "readOnly": True
         },
 
         {
             "type": "panel",
-            "name": "panel_onto_conditions",
-            "title": "Experimental conditions / factors",
-            "description": "Map experimental conditions defined on the Method page (e.g. concentration, time, replicate). Suggested ontologies: PATO, EFO, OBI, NCIT.",
+            "name": "panel_onto_search",
+            "title": "Search",
+            "state": "expanded",
             "elements": [
+
                 {
-                    "type": "matrixdynamic",
-                    "name": "onto_conditions",
-                    "title": "Conditions ontology mapping",
+                    "type": "dropdown",
+                    "name": "onto_source_type",
+                    "title": "Source type",
+                    "isRequired": False,
+                    "placeholder": "What kind of field are you mapping?",
+                    "startWithNewLine": True,
+                    "choices": [
+                        {"value": "conditions",           "text": "Experimental condition / factor"},
+                        {"value": "raw_data_report",      "text": "Raw data endpoint"},
+                        {"value": "question3",            "text": "Processed result endpoint"},
+                        {"value": "calibration_report",   "text": "Calibration curve endpoint"},
+                        {"value": "METADATA_PARAMETERS",  "text": "Method parameter"},
+                        {"value": "METADATA_SAMPLE_INFO", "text": "Sample descriptor"},
+                        {"value": "METADATA_SAMPLE_PREP", "text": "Sample preparation parameter"},
+                        {"value": "units",                "text": "Unit"}
+                    ]
+                },
+
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_conditions",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'conditions'",
+                    "placeholder": "Select a condition...",
+                    "choicesFromQuestion": "conditions",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "conditon_name",
+                    "choiceTextsFromQuestion": "conditon_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_raw",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'raw_data_report'",
+                    "placeholder": "Select a raw endpoint...",
+                    "choicesFromQuestion": "raw_data_report",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "raw_endpoint",
+                    "choiceTextsFromQuestion": "raw_endpoint"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_results",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'question3'",
+                    "placeholder": "Select a result endpoint...",
+                    "choicesFromQuestion": "question3",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "result_name",
+                    "choiceTextsFromQuestion": "result_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_calibration",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'calibration_report'",
+                    "placeholder": "Select a calibration endpoint...",
+                    "choicesFromQuestion": "calibration_report",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "calibration_entry",
+                    "choiceTextsFromQuestion": "calibration_entry"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_params",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_PARAMETERS'",
+                    "placeholder": "Select a method parameter...",
+                    "choicesFromQuestion": "METADATA_PARAMETERS",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_name",
+                    "choiceTextsFromQuestion": "param_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_sample",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_SAMPLE_INFO'",
+                    "placeholder": "Select a sample descriptor...",
+                    "choicesFromQuestion": "METADATA_SAMPLE_INFO",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_sample_name",
+                    "choiceTextsFromQuestion": "param_sample_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_sampleprep",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_SAMPLE_PREP'",
+                    "placeholder": "Select a sample prep parameter...",
+                    "choicesFromQuestion": "METADATA_SAMPLE_PREP",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_sampleprep_name",
+                    "choiceTextsFromQuestion": "param_sampleprep_name"
+                },
+                {
+                    "type": "text",
+                    "name": "onto_field_name_unit",
+                    "title": "Unit (as written in blueprint)",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'units'",
+                    "placeholder": "e.g. Ohm.cm2"
+                },
+
+                {
+                    "type": "dropdown",
+                    "name": "onto_scope",
+                    "title": "Ontology",
+                    "startWithNewLine": True,
+                    "placeholder": "Select ontology to search...",
+                    "choices": [
+                        {"value": "pato",     "text": "PATO — Phenotype and Trait Ontology"},
+                        {"value": "efo",      "text": "EFO — Experimental Factor Ontology"},
+                        {"value": "obi",      "text": "OBI — Ontology for Biomedical Investigations"},
+                        {"value": "ncit",     "text": "NCIT — NCI Thesaurus"},
+                        {"value": "bao",      "text": "BAO — BioAssay Ontology"},
+                        {"value": "npo",      "text": "NPO — NanoParticle Ontology"},
+                        {"value": "chebi",    "text": "CHEBI — Chemical Entities of Biological Interest"},
+                        {"value": "go",       "text": "GO — Gene Ontology"},
+                        {"value": "uo",       "text": "UO — Units Ontology"},
+                        {"value": "envo",     "text": "ENVO — Environment Ontology"},
+                        {"value": "chmo",     "text": "CHMO — Chemical Methods Ontology"},
+                        {"value": "clo",      "text": "CLO — Cell Line Ontology"},
+                        {"value": "ncbitaxon","text": "NCBITaxon — NCBI Taxonomy"}
+                    ]
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_search_result",
+                    "title": "Search term",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_scope} notempty",
+                    "placeholder": "Type at least 2 characters...",
+                    "searchEnabled": True,
+                    "choicesLazyLoadEnabled": True,
+                    "choicesLazyLoadPageSize": 25
+                },
+
+                {
+                    "type": "expression",
+                    "name": "onto_preview_label",
+                    "title": "Term label",
+                    "startWithNewLine": True,
+                    "visibleIf": "{onto_search_result} notempty",
+                    "expression": "{onto_search_result}",
+                    "displayStyle": "text"
+                },
+
+                {
+                    "type": "html",
+                    "name": "onto_add_button",
                     "titleLocation": "hidden",
-                    "addRowText": "Add condition mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_cond_name",
-                            "title": "Condition name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "conditions",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "conditon_name",
-                            "choiceTextsFromQuestion": "conditon_name",
-                            "placeholder": "Select condition..."
-                        },
-                        {
-                            "name": "onto_cond_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. mass concentration"
-                        },
-                        {
-                            "name": "onto_cond_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. PATO:0001019",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE (e.g. PATO:0001019)"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_cond_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "PATO", "EFO", "OBI", "NCIT", "BAO", "NPO",
-                                "CHEBI", "GO", "UO", "QUDT", "ENVO", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_cond_uri",
-                            "title": "Term URI",
-                            "placeholder": "e.g. http://purl.obolibrary.org/obo/PATO_0001019"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_cond_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_search_result} notempty",
+                    "html": "<div style='padding-top:24px'><button type='button' class='sd-btn sd-btn--action' onclick='window.addOntologyRow()'>＋ Add to mapping</button></div>",
+                    "readOnly": True
                 }
             ]
         },
 
         {
             "type": "panel",
-            "name": "panel_onto_raw",
-            "title": "Raw data endpoints",
-            "description": "Map raw (unprocessed) result endpoints defined on the Results page. Suggested ontologies: BAO, NPO, NCIT, CHEBI.",
-            "visibleIf": "{data_sheets} contains 'data_raw'",
+            "name": "panel_onto_table",
+            "title": "Mapping table",
+            "description": "All mappings collected so far. The 'Source key' column contains the machine-readable question name used by the converter to locate the correct column in the Excel file.",
             "elements": [
                 {
                     "type": "matrixdynamic",
-                    "name": "onto_raw",
-                    "title": "Raw endpoints ontology mapping",
+                    "name": "onto_mappings",
+                    "title": "Ontology mappings",
                     "titleLocation": "hidden",
-                    "addRowText": "Add raw endpoint mapping",
+                    "addRowText": "Add row manually",
                     "confirmDelete": True,
                     "rowCount": 0,
                     "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
+                    "allowRowsDragAndDrop": True,
                     "columns": [
                         {
-                            "name": "onto_raw_name",
-                            "title": "Endpoint name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "raw_data_report",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "raw_endpoint",
-                            "choiceTextsFromQuestion": "raw_endpoint",
-                            "placeholder": "Select endpoint..."
-                        },
-                        {
-                            "name": "onto_raw_label",
-                            "title": "Ontology term label",
+                            "name": "onto_map_source_key",
+                            "title": "Source key",
                             "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. lactate dehydrogenase activity measurement"
+                            "readOnly": False,
+                            "placeholder": "e.g. raw_data_report"
                         },
                         {
-                            "name": "onto_raw_id",
+                            "name": "onto_map_source_label",
+                            "title": "Source type",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "placeholder": "e.g. Raw data endpoint"
+                        },
+                        {
+                            "name": "onto_map_field_name",
+                            "title": "Field name",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "isRequired": True,
+                            "placeholder": "e.g. LDH activity in BALF"
+                        },
+                        {
+                            "name": "onto_map_term_label",
+                            "title": "Term label",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "isRequired": True,
+                            "placeholder": "e.g. lactate dehydrogenase activity"
+                        },
+                        {
+                            "name": "onto_map_term_id",
                             "title": "Term ID (CURIE)",
                             "cellType": "text",
+                            "readOnly": False,
                             "isRequired": True,
                             "placeholder": "e.g. BAO:0002434",
                             "validators": [
                                 {
                                     "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
+                                    "regex": "^[A-Za-z][A-Za-z0-9_\\-]+:[A-Za-z0-9_\\-]+$",
                                     "text": "Please enter a valid CURIE (e.g. BAO:0002434)"
                                 }
                             ]
                         },
                         {
-                            "name": "onto_raw_source",
+                            "name": "onto_map_ontology",
                             "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "BAO", "NPO", "NCIT", "CHEBI", "GO",
-                                "PATO", "EFO", "OBI", "UO", "QUDT", "OTHER"
-                            ]
+                            "cellType": "text",
+                            "readOnly": False,
+                            "placeholder": "e.g. BAO"
                         }
                     ],
                     "detailElements": [
                         {
                             "type": "text",
-                            "name": "onto_raw_uri",
+                            "name": "onto_map_uri",
                             "title": "Term URI",
                             "placeholder": "e.g. http://www.bioassayontology.org/bao#BAO_0002434"
                         },
                         {
                             "type": "comment",
-                            "name": "onto_raw_comment",
+                            "name": "onto_map_comment",
                             "title": "Mapping comment / justification"
                         }
                     ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-
-        {
-            "type": "panel",
-            "name": "panel_onto_results",
-            "title": "Processed result endpoints",
-            "description": "Map processed (aggregated) result endpoints defined on the Results page. Suggested ontologies: BAO, NPO, NCIT, CHEBI.",
-            "visibleIf": "{data_sheets} contains 'data_processed'",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_results",
-                    "title": "Processed endpoints ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add result endpoint mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_result_name",
-                            "title": "Endpoint name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "question3",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "result_name",
-                            "choiceTextsFromQuestion": "result_name",
-                            "placeholder": "Select endpoint..."
-                        },
-                        {
-                            "name": "onto_result_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. cell viability"
-                        },
-                        {
-                            "name": "onto_result_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. BAO:0002151",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE (e.g. BAO:0002151)"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_result_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "BAO", "NPO", "NCIT", "CHEBI", "GO",
-                                "PATO", "EFO", "OBI", "UO", "QUDT", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_result_uri",
-                            "title": "Term URI",
-                            "placeholder": "e.g. http://www.bioassayontology.org/bao#BAO_0002151"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_result_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-
-        {
-            "type": "panel",
-            "name": "panel_onto_calibration",
-            "title": "Calibration curve endpoints",
-            "description": "Map calibration curve endpoints defined on the Results page. Suggested ontologies: BAO, CHEBI, NCIT.",
-            "visibleIf": "{data_sheets} contains 'data_calibration'",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_calibration",
-                    "title": "Calibration endpoints ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add calibration endpoint mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_calib_name",
-                            "title": "Endpoint name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "calibration_report",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "calibration_entry",
-                            "choiceTextsFromQuestion": "calibration_entry",
-                            "placeholder": "Select endpoint..."
-                        },
-                        {
-                            "name": "onto_calib_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. absorbance"
-                        },
-                        {
-                            "name": "onto_calib_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. PATO:0001242",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_calib_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "BAO", "PATO", "CHEBI", "NCIT",
-                                "OBI", "EFO", "UO", "QUDT", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_calib_uri",
-                            "title": "Term URI"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_calib_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-
-        {
-            "type": "panel",
-            "name": "panel_onto_params",
-            "title": "Method parameters",
-            "description": "Map method and instrument parameters defined on the Method parameters page. Suggested ontologies: OBI, EFO, CHMO, BAO.",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_params",
-                    "title": "Method parameters ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add parameter mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_param_name",
-                            "title": "Parameter name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "METADATA_PARAMETERS",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "param_name",
-                            "choiceTextsFromQuestion": "param_name",
-                            "placeholder": "Select parameter..."
-                        },
-                        {
-                            "name": "onto_param_group",
-                            "title": "Group",
-                            "cellType": "dropdown",
-                            "isRequired": False,
-                            "choicesFromQuestion": "METADATA_PARAMETERS",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "param_group",
-                            "choiceTextsFromQuestion": "param_group",
-                            "placeholder": "Group (read from blueprint)"
-                        },
-                        {
-                            "name": "onto_param_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. anesthetic agent role"
-                        },
-                        {
-                            "name": "onto_param_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. OBI:0000070",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE (e.g. OBI:0000070)"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_param_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "OBI", "EFO", "CHMO", "BAO", "NCIT",
-                                "PATO", "CHEBI", "GO", "UO", "QUDT", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_param_uri",
-                            "title": "Term URI",
-                            "placeholder": "e.g. http://purl.obolibrary.org/obo/OBI_0000070"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_param_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-
-        {
-            "type": "panel",
-            "name": "panel_onto_sample",
-            "title": "Sample / material descriptors",
-            "description": "Map sample and material descriptor fields defined on the Sample page. Suggested ontologies: NCBI Taxonomy, CLO, EFO, CHEBI. Note: these mappings describe the descriptor type (e.g. 'species' → NCBI Taxonomy class). Instance-level mappings (which specific species) are handled at data entry time.",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_sample",
-                    "title": "Sample descriptors ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add sample descriptor mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_sample_name",
-                            "title": "Descriptor name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "METADATA_SAMPLE_INFO",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "param_sample_name",
-                            "choiceTextsFromQuestion": "param_sample_name",
-                            "placeholder": "Select descriptor..."
-                        },
-                        {
-                            "name": "onto_sample_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. Rattus norvegicus"
-                        },
-                        {
-                            "name": "onto_sample_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. NCBITaxon:10116",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE (e.g. NCBITaxon:10116)"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_sample_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "NCBITaxon", "CLO", "EFO", "CHEBI",
-                                "OBI", "NCIT", "BAO", "NPO", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_sample_uri",
-                            "title": "Term URI",
-                            "placeholder": "e.g. http://purl.obolibrary.org/obo/NCBITaxon_10116"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_sample_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-
-        {
-            "type": "panel",
-            "name": "panel_onto_sampleprep",
-            "title": "Sample preparation parameters",
-            "description": "Map sample preparation parameters defined on the Sample preparation page. Suggested ontologies: OBI, EFO, BAO, CHEBI.",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_sampleprep",
-                    "title": "Sample preparation ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add sample prep mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "columns": [
-                        {
-                            "name": "onto_sampleprep_name",
-                            "title": "Parameter name",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "choicesFromQuestion": "METADATA_SAMPLE_PREP",
-                            "choicesFromQuestionMode": "column",
-                            "choiceValuesFromQuestion": "param_sampleprep_name",
-                            "choiceTextsFromQuestion": "param_sampleprep_name",
-                            "placeholder": "Select parameter..."
-                        },
-                        {
-                            "name": "onto_sampleprep_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. dispersion protocol"
-                        },
-                        {
-                            "name": "onto_sampleprep_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. OBI:0302887",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_]+:[A-Za-z0-9_]+$",
-                                    "text": "Please enter a valid CURIE"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_sampleprep_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": [
-                                "OBI", "EFO", "BAO", "CHEBI", "NCIT",
-                                "PATO", "GO", "NPO", "OTHER"
-                            ]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_sampleprep_uri",
-                            "title": "Term URI"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_sampleprep_comment",
-                            "title": "Mapping comment / justification"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
-                }
-            ]
-        },
-        {
-            "type": "panel",
-            "name": "panel_onto_units",
-            "title": "Units",
-            "description": "Map all units appearing anywhere in this blueprint to ontology terms. Collect units from conditions, raw endpoints, processed endpoints, method parameters, and sample preparation. Suggested ontologies: UO (Units Ontology) for biological/chemical units; QUDT for complex or derived units (e.g. Ohm.cm2). Each distinct unit string should appear only once here regardless of how many fields use it.",
-            "elements": [
-                {
-                    "type": "matrixdynamic",
-                    "name": "onto_units",
-                    "title": "Units ontology mapping",
-                    "titleLocation": "hidden",
-                    "addRowText": "Add unit mapping",
-                    "confirmDelete": True,
-                    "rowCount": 0,
-                    "minRowCount": 0,
-                    "allowRowsDragAndDrop": False,
-                    "showCommentArea": True,
-                    "commentText": "Notes on unit coverage or deviations from standard unit representations",
-                    "columns": [
-                        {
-                            "name": "onto_unit_text",
-                            "title": "Unit (as written in blueprint)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. Ohm.cm2"
-                        },
-                        {
-                            "name": "onto_unit_label",
-                            "title": "Ontology term label",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. ohm square centimeter"
-                        },
-                        {
-                            "name": "onto_unit_id",
-                            "title": "Term ID (CURIE)",
-                            "cellType": "text",
-                            "isRequired": True,
-                            "placeholder": "e.g. QUDT:OHM-M2 or UO:0000082",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "regex": "^[A-Za-z][A-Za-z0-9_\\-]+:[A-Za-z0-9_\\-]+$",
-                                    "text": "Please enter a valid CURIE"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "onto_unit_source",
-                            "title": "Ontology",
-                            "cellType": "dropdown",
-                            "isRequired": True,
-                            "placeholder": "Select...",
-                            "choices": ["UO", "QUDT", "OTHER"]
-                        }
-                    ],
-                    "detailElements": [
-                        {
-                            "type": "text",
-                            "name": "onto_unit_uri",
-                            "title": "Term URI",
-                            "placeholder": "e.g. http://qudt.org/vocab/unit/OHM-M2"
-                        },
-                        {
-                            "type": "text",
-                            "name": "onto_unit_si_equivalent",
-                            "title": "SI equivalent (if non-SI unit)",
-                            "placeholder": "e.g. kg.m4.s-3.A-2"
-                        },
-                        {
-                            "type": "comment",
-                            "name": "onto_unit_comment",
-                            "title": "Comment"
-                        }
-                    ],
-                    "detailPanelMode": "underRowSingle"
+                    "detailPanelMode": "underRowSingle",
+                    "detailPanelShowOnAdding": False
                 }
             ]
         }
-            ]
-        },
+    ]
+},
         {
             "name": "page_preview",
             "elements": [
