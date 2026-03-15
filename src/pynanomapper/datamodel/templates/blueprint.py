@@ -738,12 +738,12 @@ def iom_format_2excel(
             workbook, writer, materials=_SHEET_MATERIAL,
             info=_SHEET_INFO, results=linksheets)
         #debug
-        df_info.to_excel(writer, sheet_name="df_info", index=False, freeze_panes=(2, 0))
-        if df_result is not None:
-            df_result.to_excel(writer, sheet_name="df_result", index=False, freeze_panes=(2, 0))
-        if df_raw is not None:
-            df_raw.to_excel(writer, sheet_name="df_raw", index=False, freeze_panes=(2, 0))
-        df_conditions.to_excel(writer, sheet_name="df_conditions", index=False, freeze_panes=(2, 0))
+        #df_info.to_excel(writer, sheet_name="df_info", index=False, freeze_panes=(2, 0))
+        #if df_result is not None:
+        #    df_result.to_excel(writer, sheet_name="df_result", index=False, freeze_panes=(2, 0))
+        #if df_raw is not None:
+        #    df_raw.to_excel(writer, sheet_name="df_raw", index=False, freeze_panes=(2, 0))
+        #df_conditions.to_excel(writer, sheet_name="df_conditions", index=False, freeze_panes=(2, 0))
 
 
 def create_materials_sheet(workbook, writer, materials, info=None, results=[], material_column="A3:A1048576"):

@@ -314,6 +314,8 @@ survey_js = {
                                     "value": "EXPOSURE",
                                     "text": "Exposure",
                                 },
+                                {"value": "LCA",        "text": "Life cycle assessment"},
+                                {"value": "SOCIO_ECON", "text": "Socio-economic assessment"}
                             ],
                             "placeholder": "P-CHEM",
                         },
@@ -810,6 +812,22 @@ survey_js = {
                                     ),
                                     "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'EXPOSURE'",
                                 },
+                                {
+                                    "value": "LCI_INVENTORY_SECTION",
+                                    "text":  "LCA.1.Life cycle inventory (unit process)",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'LCA'"},
+                                {
+                                    "value": "LCIA_IMPACT_SECTION",
+                                    "text":  "LCA.2.Life cycle impact assessment (EF 3.1)",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'LCA'"},
+                                {
+                                    "value": "SLCA_SOCIAL_RISKS_SECTION",
+                                    "text":  "SE.1.Social LCA - reference scale assessment",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'SOCIO_ECON'"},
+                                {
+                                    "value": "SLCA_CRM_SECTION",
+                                    "text":  "SE.2.Critical raw material identification",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'SOCIO_ECON'"},
                             ],
                         },
                         {
