@@ -314,6 +314,8 @@ survey_js = {
                                     "value": "EXPOSURE",
                                     "text": "Exposure",
                                 },
+                                {"value": "LCA",        "text": "Life cycle assessment"},
+                                {"value": "SOCIO_ECON", "text": "Socio-economic assessment"}
                             ],
                             "placeholder": "P-CHEM",
                         },
@@ -810,6 +812,22 @@ survey_js = {
                                     ),
                                     "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'EXPOSURE'",
                                 },
+                                {
+                                    "value": "LCI_INVENTORY_SECTION",
+                                    "text":  "LCA.1.Life cycle inventory (unit process)",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'LCA'"},
+                                {
+                                    "value": "LCIA_IMPACT_SECTION",
+                                    "text":  "LCA.2.Life cycle impact assessment (EF 3.1)",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'LCA'"},
+                                {
+                                    "value": "SLCA_SOCIAL_RISKS_SECTION",
+                                    "text":  "SE.1.Social LCA - reference scale assessment",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'SOCIO_ECON'"},
+                                {
+                                    "value": "SLCA_CRM_SECTION",
+                                    "text":  "SE.2.Critical raw material identification",
+                                    "visibleIf": "{PROTOCOL_TOP_CATEGORY} = 'SOCIO_ECON'"},
                             ],
                         },
                         {
@@ -1853,6 +1871,287 @@ survey_js = {
             "navigationTitle": "7. Layout",
             "navigationDescription": "Select the most appropriate Excel layout",
         },
+{
+    "name": "page_ontology",
+    "title": "[{template_name}]: Ontology Mapping",
+    "description": "Map free-text names from this blueprint to ontology terms. Use the search panel to find a term in OLS, then add it to the mapping table.",
+    "navigationTitle": "8. Ontology",
+    "navigationDescription": "Map endpoints, parameters and units to ontology terms",
+    "elements": [
+
+        {
+            "type": "html",
+            "name": "help_ontology_intro",
+            "titleLocation": "hidden",
+            "html": "<div class='alert alert-info'><b>How to use:</b> (1) Select the <b>source type</b> and the <b>name</b> you want to map. (2) Select an <b>ontology</b> and type a search term. (3) Select a result from the dropdown. (4) Click <b>Add to mapping</b>. The mapping table below is what will be exported as the ontology sheet in the generated Excel file and used to annotate the NeXus output. You do not need to map every field.</div>",
+            "readOnly": True
+        },
+
+        {
+            "type": "panel",
+            "name": "panel_onto_search",
+            "title": "Search",
+            "state": "expanded",
+            "elements": [
+
+                {
+                    "type": "dropdown",
+                    "name": "onto_source_type",
+                    "title": "Source type",
+                    "isRequired": False,
+                    "placeholder": "What kind of field are you mapping?",
+                    "startWithNewLine": True,
+                    "choices": [
+                        {"value": "conditions",           "text": "Experimental condition / factor"},
+                        {"value": "raw_data_report",      "text": "Raw data endpoint"},
+                        {"value": "question3",            "text": "Processed result endpoint"},
+                        {"value": "calibration_report",   "text": "Calibration curve endpoint"},
+                        {"value": "METADATA_PARAMETERS",  "text": "Method parameter"},
+                        {"value": "METADATA_SAMPLE_INFO", "text": "Sample descriptor"},
+                        {"value": "METADATA_SAMPLE_PREP", "text": "Sample preparation parameter"},
+                        {"value": "units",                "text": "Unit"}
+                    ]
+                },
+
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_conditions",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'conditions'",
+                    "placeholder": "Select a condition...",
+                    "choicesFromQuestion": "conditions",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "conditon_name",
+                    "choiceTextsFromQuestion": "conditon_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_raw",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'raw_data_report'",
+                    "placeholder": "Select a raw endpoint...",
+                    "choicesFromQuestion": "raw_data_report",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "raw_endpoint",
+                    "choiceTextsFromQuestion": "raw_endpoint"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_results",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'question3'",
+                    "placeholder": "Select a result endpoint...",
+                    "choicesFromQuestion": "question3",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "result_name",
+                    "choiceTextsFromQuestion": "result_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_calibration",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'calibration_report'",
+                    "placeholder": "Select a calibration endpoint...",
+                    "choicesFromQuestion": "calibration_report",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "calibration_entry",
+                    "choiceTextsFromQuestion": "calibration_entry"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_params",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_PARAMETERS'",
+                    "placeholder": "Select a method parameter...",
+                    "choicesFromQuestion": "METADATA_PARAMETERS",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_name",
+                    "choiceTextsFromQuestion": "param_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_sample",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_SAMPLE_INFO'",
+                    "placeholder": "Select a sample descriptor...",
+                    "choicesFromQuestion": "METADATA_SAMPLE_INFO",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_sample_name",
+                    "choiceTextsFromQuestion": "param_sample_name"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_field_name_sampleprep",
+                    "title": "Field name",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'METADATA_SAMPLE_PREP'",
+                    "placeholder": "Select a sample prep parameter...",
+                    "choicesFromQuestion": "METADATA_SAMPLE_PREP",
+                    "choicesFromQuestionMode": "column",
+                    "choiceValuesFromQuestion": "param_sampleprep_name",
+                    "choiceTextsFromQuestion": "param_sampleprep_name"
+                },
+                {
+                    "type": "text",
+                    "name": "onto_field_name_unit",
+                    "title": "Unit (as written in blueprint)",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_source_type} = 'units'",
+                    "placeholder": "e.g. Ohm.cm2"
+                },
+
+                {
+                    "type": "dropdown",
+                    "name": "onto_scope",
+                    "title": "Ontology",
+                    "startWithNewLine": True,
+                    "placeholder": "Select ontology to search...",
+                    "choices": [
+                        {"value": "pato",     "text": "PATO — Phenotype and Trait Ontology"},
+                        {"value": "efo",      "text": "EFO — Experimental Factor Ontology"},
+                        {"value": "obi",      "text": "OBI — Ontology for Biomedical Investigations"},
+                        {"value": "ncit",     "text": "NCIT — NCI Thesaurus"},
+                        {"value": "bao",      "text": "BAO — BioAssay Ontology"},
+                        {"value": "npo",      "text": "NPO — NanoParticle Ontology"},
+                        {"value": "chebi",    "text": "CHEBI — Chemical Entities of Biological Interest"},
+                        {"value": "go",       "text": "GO — Gene Ontology"},
+                        {"value": "uo",       "text": "UO — Units Ontology"},
+                        {"value": "envo",     "text": "ENVO — Environment Ontology"},
+                        {"value": "chmo",     "text": "CHMO — Chemical Methods Ontology"},
+                        {"value": "clo",      "text": "CLO — Cell Line Ontology"},
+                        {"value": "ncbitaxon","text": "NCBITaxon — NCBI Taxonomy"}
+                    ]
+                },
+                {
+                    "type": "dropdown",
+                    "name": "onto_search_result",
+                    "title": "Search term",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_scope} notempty",
+                    "placeholder": "Type at least 2 characters...",
+                    "searchEnabled": True,
+                    "choicesLazyLoadEnabled": True,
+                    "choicesLazyLoadPageSize": 25
+                },
+
+                {
+                    "type": "expression",
+                    "name": "onto_preview_label",
+                    "title": "Term label",
+                    "startWithNewLine": True,
+                    "visibleIf": "{onto_search_result} notempty",
+                    "expression": "{onto_search_result}",
+                    "displayStyle": "text"
+                },
+
+                {
+                    "type": "html",
+                    "name": "onto_add_button",
+                    "titleLocation": "hidden",
+                    "startWithNewLine": False,
+                    "visibleIf": "{onto_search_result} notempty",
+                    "html": "<div style='padding-top:24px'><button type='button' class='sd-btn sd-btn--action' onclick='window.addOntologyRow()'>＋ Add to mapping</button></div>",
+                    "readOnly": True
+                }
+            ]
+        },
+
+        {
+            "type": "panel",
+            "name": "panel_onto_table",
+            "title": "Mapping table",
+            "description": "All mappings collected so far. The 'Source key' column contains the machine-readable question name used by the converter to locate the correct column in the Excel file.",
+            "elements": [
+                {
+                    "type": "matrixdynamic",
+                    "name": "onto_mappings",
+                    "title": "Ontology mappings",
+                    "titleLocation": "hidden",
+                    "addRowText": "Add row manually",
+                    "confirmDelete": True,
+                    "rowCount": 0,
+                    "minRowCount": 0,
+                    "allowRowsDragAndDrop": True,
+                    "columns": [
+                        {
+                            "name": "onto_map_source_key",
+                            "title": "Source key",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "placeholder": "e.g. raw_data_report"
+                        },
+                        {
+                            "name": "onto_map_source_label",
+                            "title": "Source type",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "placeholder": "e.g. Raw data endpoint"
+                        },
+                        {
+                            "name": "onto_map_field_name",
+                            "title": "Field name",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "isRequired": True,
+                            "placeholder": "e.g. LDH activity in BALF"
+                        },
+                        {
+                            "name": "onto_map_term_label",
+                            "title": "Term label",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "isRequired": True,
+                            "placeholder": "e.g. lactate dehydrogenase activity"
+                        },
+                        {
+                            "name": "onto_map_term_id",
+                            "title": "Term ID (CURIE)",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "isRequired": True,
+                            "placeholder": "e.g. BAO:0002434",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "regex": "^[A-Za-z][A-Za-z0-9_\\-]+:[A-Za-z0-9_\\-]+$",
+                                    "text": "Please enter a valid CURIE (e.g. BAO:0002434)"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "onto_map_ontology",
+                            "title": "Ontology",
+                            "cellType": "text",
+                            "readOnly": False,
+                            "placeholder": "e.g. BAO"
+                        }
+                    ],
+                    "detailElements": [
+                        {
+                            "type": "text",
+                            "name": "onto_map_uri",
+                            "title": "Term URI",
+                            "placeholder": "e.g. http://www.bioassayontology.org/bao#BAO_0002434"
+                        },
+                        {
+                            "type": "comment",
+                            "name": "onto_map_comment",
+                            "title": "Mapping comment / justification"
+                        }
+                    ],
+                    "detailPanelMode": "underRowSingle",
+                    "detailPanelShowOnAdding": False
+                }
+            ]
+        }
+    ]
+},
         {
             "name": "page_preview",
             "elements": [
