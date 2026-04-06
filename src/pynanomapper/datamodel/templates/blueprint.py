@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from openpyxl.comments import Comment
 from copy import copy
 import pyambit.datamodel as mb
+import re as _re
 
 
 METADATA_PARAMETERS = "METADATA_PARAMETERS"
@@ -846,3 +847,331 @@ def get_datamodel(json_blueprint):
 def get_parameters(json_blueprint):
     
     return None
+
+
+def apply_blueprint_customizations(df_info, df_result, df_conditions, json_blueprint):
+    """
+    Fill df_info, df_result, and df_conditions with default/custom values
+    from the blueprint before writing to Excel.
+    """
+    # --- Method metadata ---
+    method_meta = get_method_metadata(json_blueprint)
+    df_info.loc[df_info['datamodel'] == 'METHOD', 'value'] = df_info.loc[df_info['datamodel'] == 'METHOD', 'param_name'].map(
+        lambda x: method_meta.get(x, "")
+    )
+
+    # --- Sample metadata ---
+    sample_meta = get_materials_metadata(json_blueprint)
+    df_info.loc[df_info['datamodel'] == METADATA_SAMPLE_INFO, 'value'] = df_info.loc[df_info['datamodel'] == METADATA_SAMPLE_INFO, 'param_name'].map(
+        lambda x: sample_meta.get(x, "")
+    )
+
+    # --- Sample prep metadata ---
+    for prep in json_blueprint.get(METADATA_SAMPLE_PREP, []):
+        mask = df_info['param_name'] == prep.get('param_sampleprep_name')
+        df_info.loc[mask, 'value'] = prep.get('default_value', "")
+
+    # --- Parameters ---
+    for param in json_blueprint.get(METADATA_PARAMETERS, []):
+        mask = df_info['param_name'] == param.get('param_name')
+        df_info.loc[mask, 'value'] = param.get('default_value', "")
+
+    # --- Treatments ---
+    treatment_df = get_treatment(json_blueprint)
+    for idx, row in df_info.iterrows():
+        if row['param_name'] in treatment_df['param_name'].values:
+            df_info.at[idx, 'value'] = treatment_df.loc[treatment_df['param_name'] == row['param_name'], 'value'].values[0]
+
+    # --- Pre-fill results table if defaults exist ---
+    if df_result is not None:
+        for res in json_blueprint.get("question3", []):
+            mask = df_result['result_name'] == res['result_name']
+            if mask.any() and 'default_value' in res:
+                # Fill first condition column with default
+                conditions = res.get('results_conditions', [])
+                if conditions:
+                    first_cond = conditions[0]
+                    if first_cond in df_result.columns:
+                        df_result.loc[mask, first_cond] = res['default_value']
+
+    # --- Fill units in df_conditions ---
+    for idx, row in df_conditions.iterrows():
+        df_conditions.at[idx, 'condition_unit'] = row.get('condition_unit', "")
+
+    return df_info, df_result, df_conditions
+
+def apply_custom_values(df_info, df_conditions, df_result, customization_json):
+    """
+    Apply default/custom values from the customization JSON directly into the dataframes.
+    This ensures that the Excel sheets are pre-filled.
+    """
+    # Parameters
+    for param in customization_json.get("METADATA_PARAMETERS", []):
+        mask = df_info["param_name"] == param.get("param_name")
+        if mask.any() and "value" in param:
+            df_info.loc[mask, "value"] = param["value"]
+
+    # Sample preparations
+    for prep in customization_json.get("METADATA_SAMPLE_PREP", []):
+        mask = df_info["param_name"] == prep.get("param_sampleprep_name")
+        if mask.any() and "value" in prep:
+            df_info.loc[mask, "value"] = prep["value"]
+
+    # Conditions
+    for cond in customization_json.get("conditions", []):
+        mask = df_conditions["conditon_name"] == cond.get("conditon_name")
+        if mask.any() and "value" in cond:
+            df_conditions.loc[mask, "value"] = cond["value"]
+
+    # Results / Endpoints
+    for result in customization_json.get("question3", []):
+        mask = df_result["result_name"] == result.get("result_name")
+        if mask.any() and "value" in result:
+            df_result.loc[mask, "value"] = result["value"]
+
+    return df_info, df_conditions, df_result
+
+
+def _slug(text):
+    """Mirror of data_entry_survey._slug — converts a param name to a question-name slug."""
+    return _re.sub(r"[^A-Za-z0-9_]", "_", str(text).strip()).lower()
+
+
+def write_customization_to_excel(file_path_xlsx, blueprint_json, custom_json):
+    """
+    Apply data-entry survey answers (custom_json) to an already-generated
+    blueprint Excel file (file_path_xlsx).
+
+    The custom_json is the SurveyJS answer payload produced by DataPage /
+    data_entry_survey, whose question names follow the convention built by
+    data_entry_survey.py::
+
+        de_provenance_*          → provenance rows in Test_conditions
+        de_sample__<slug>        → METADATA_SAMPLE_INFO rows
+        de_sampleprep__<slug>    → METADATA_SAMPLE_PREP rows
+        de_params__<slug>        → METADATA_PARAMETERS rows
+        de_condition__<slug>     → condition level series (ignored for Excel
+                                   column headers, used as data row values)
+        de_results               → list-of-dicts, fills Results_TABLE rows
+        de_raw_data              → list-of-dicts, fills Raw_data_TABLE rows
+        de_calibration           → list-of-dicts, fills Calibration_TABLE rows
+        de_experiment_id         → stored in hidden sheet
+        de_notes                 → stored in hidden sheet
+
+    Fills column B of Test_conditions for every matching param_name and
+    appends data rows to Raw_data_TABLE / Results_TABLE / Calibration_TABLE.
+    Also updates the hidden TemplateDesigner sheet so NeXus conversion picks
+    up the merged data automatically.
+
+    Parameters
+    ----------
+    file_path_xlsx : str
+        Path to the Excel file previously generated by iom_format_2excel.
+    blueprint_json : dict
+        The original blueprint JSON (used to build slug→param_name maps).
+    custom_json : dict
+        The SurveyJS answer payload from the data-entry survey.
+
+    Returns
+    -------
+    str
+        Path to the modified Excel file.
+    """
+    from openpyxl import load_workbook
+    import json
+
+    wb = load_workbook(file_path_xlsx)
+
+    # ------------------------------------------------------------------
+    # 1.  Build reverse-slug maps:  slug → original param_name
+    # ------------------------------------------------------------------
+    slug_to_param   = {}   # de_params__<slug>    → param_name
+    slug_to_prep    = {}   # de_sampleprep__<slug> → param_sampleprep_name
+    slug_to_sample  = {}   # de_sample__<slug>    → param_sample_name
+
+    for p in blueprint_json.get(METADATA_PARAMETERS, []):
+        name = p.get("param_name", "")
+        slug_to_param[f"de_params__{_slug(name)}"] = name
+
+    for p in blueprint_json.get(METADATA_SAMPLE_PREP, []):
+        name = p.get("param_sampleprep_name", "")
+        slug_to_prep[f"de_sampleprep__{_slug(name)}"] = name
+
+    for p in blueprint_json.get(METADATA_SAMPLE_INFO, []):
+        name = p.get("param_sample_name", "")
+        slug_to_sample[f"de_sample__{_slug(name)}"] = name
+
+    # Provenance keys map directly to method-metadata row labels
+    # (these are the labels written by get_method_metadata / iom_format_2excel)
+    PROVENANCE_MAP = {
+        "de_provenance_operator":     "Assay/Test work conducted by",
+        "de_provenance_provider":     "Partner conducting test/assay",
+        "de_provenance_contact":      "Lead Scientist & contact for test",
+        "de_provenance_project":      "Project Work Package",
+        "de_provenance_workpackage":  "Project Work Package",
+        "de_provenance_startdate":    "Test start date",
+        "de_provenance_enddate":      "Test end date",
+    }
+
+    # ------------------------------------------------------------------
+    # 2.  Fill Test_conditions column B
+    # ------------------------------------------------------------------
+    _SHEET_CONDITIONS = "Test_conditions"
+    if _SHEET_CONDITIONS in wb.sheetnames:
+        ws_tc = wb[_SHEET_CONDITIONS]
+
+        # Build row-index map:  param_name (col A text) → row number
+        label_to_row = {}
+        for row in ws_tc.iter_rows():
+            a_cell = row[0]
+            if a_cell.value and str(a_cell.value).strip():
+                label_to_row[str(a_cell.value).strip()] = a_cell.row
+
+        def _write_param(label, value):
+            """Write value into column B of the row whose column-A == label."""
+            if value is None or value == "":
+                return
+            row_num = label_to_row.get(label)
+            if row_num is not None:
+                ws_tc.cell(row=row_num, column=2, value=str(value))
+
+        for q_name, value in custom_json.items():
+            # Provenance
+            if q_name in PROVENANCE_MAP:
+                _write_param(PROVENANCE_MAP[q_name], value)
+            # Method parameters
+            elif q_name in slug_to_param:
+                _write_param(slug_to_param[q_name], value)
+            # Sample prep parameters
+            elif q_name in slug_to_prep:
+                _write_param(slug_to_prep[q_name], value)
+            # Sample info parameters
+            elif q_name in slug_to_sample:
+                _write_param(slug_to_sample[q_name], value)
+
+    # ------------------------------------------------------------------
+    # 3.  Build slug→endpoint name maps for data tables
+    # ------------------------------------------------------------------
+    def _ep_slug_map(items, name_key):
+        """Return dict: ep__<slug> → endpoint_name."""
+        return {f"ep__{_slug(item.get(name_key,''))}": item.get(name_key, "")
+                for item in items}
+
+    def _cond_slug_map(conditions):
+        """Return dict: cond__<slug> → condition_name."""
+        return {f"cond__{_slug(c.get('conditon_name',''))}": c.get("conditon_name", "")
+                for c in conditions}
+
+    ep_results_map  = _ep_slug_map(blueprint_json.get("question3", []),      "result_name")
+    ep_raw_map      = _ep_slug_map(blueprint_json.get("raw_data_report", []),"raw_endpoint")
+    ep_cal_map      = _ep_slug_map(blueprint_json.get("calibration_report", []), "calibration_entry")
+    cond_map        = _cond_slug_map(blueprint_json.get("conditions", []))
+
+    # ------------------------------------------------------------------
+    # 4.  Append data rows to table sheets
+    # ------------------------------------------------------------------
+    def _find_header_row(ws):
+        """Return the last contiguous header row index (1-based) before data."""
+        # Tables have 2 header rows (name, unit) then data from row 3
+        return 2
+
+    def _build_col_map(ws, ep_map, cond_map):
+        """
+        Map column letter → original name for a MultiIndex-header sheet.
+        Row 1 = top-level name, row 2 = unit (may start with 'Unnamed').
+        Returns dict: original_name → col_index (1-based)
+        """
+        col_map = {}   # original_name → openpyxl column index (1-based)
+        for cell in ws[1]:   # row 1 = endpoint / condition names
+            if cell.value and not str(cell.value).startswith("Unnamed"):
+                col_map[str(cell.value).strip()] = cell.column
+        return col_map
+
+    def _append_rows(ws, rows_data, ep_map, cond_map):
+        """
+        Append survey matrix rows to an openpyxl worksheet.
+
+        rows_data : list[dict] — each dict is one survey matrixdynamic row.
+          keys follow the pattern  cond__<slug>  or  ep__<slug>  or ep__<slug>__err
+        ep_map   : {ep__<slug>: endpoint_name}
+        cond_map : {cond__<slug>: condition_name}
+        """
+        if not rows_data:
+            return
+
+        col_map = _build_col_map(ws, ep_map, cond_map)
+        next_row = ws.max_row + 1
+
+        for row_dict in rows_data:
+            for q_key, value in row_dict.items():
+                # Resolve slug key to original column name
+                original_name = None
+                if q_key in ep_map:
+                    original_name = ep_map[q_key]
+                elif q_key in cond_map:
+                    original_name = cond_map[q_key]
+                elif q_key.endswith("__err"):
+                    # Uncertainty column: ep__<slug>__err → endpoint_name ± ...
+                    # The header contains the endpoint name; match by prefix
+                    base_slug = q_key[:-5]   # strip __err
+                    base_name = ep_map.get(base_slug, "")
+                    # Find the uncertainty column (header contains base_name and err/SD)
+                    for col_name, col_idx in col_map.items():
+                        if base_name in col_name and col_name != base_name:
+                            original_name = col_name
+                            break
+
+                if original_name and original_name in col_map:
+                    col_idx = col_map[original_name]
+                    ws.cell(row=next_row, column=col_idx, value=value)
+
+            next_row += 1
+
+    # Results_TABLE
+    if "de_results" in custom_json and "Results_TABLE" in wb.sheetnames:
+        _append_rows(
+            wb["Results_TABLE"],
+            custom_json["de_results"],
+            ep_results_map,
+            cond_map
+        )
+
+    # Raw_data_TABLE
+    if "de_raw_data" in custom_json and "Raw_data_TABLE" in wb.sheetnames:
+        _append_rows(
+            wb["Raw_data_TABLE"],
+            custom_json["de_raw_data"],
+            ep_raw_map,
+            cond_map
+        )
+
+    # Calibration_TABLE
+    if "de_calibration" in custom_json and "Calibration_TABLE" in wb.sheetnames:
+        # Calibration has a standard_label column + endpoint columns
+        ep_cal_with_label = dict(ep_cal_map)
+        ep_cal_with_label["cal_standard_label"] = "Sample"
+        _append_rows(
+            wb["Calibration_TABLE"],
+            custom_json["de_calibration"],
+            ep_cal_with_label,
+            {}
+        )
+
+    # ------------------------------------------------------------------
+    # 5.  Update hidden TemplateDesigner sheet with merged blueprint+custom
+    # ------------------------------------------------------------------
+    if "TemplateDesigner" in wb.sheetnames:
+        ws_td = wb["TemplateDesigner"]
+        # Store the customization answers so NeXus round-trip can access them
+        # Row 1: headers already present (uuid / surveyjs)
+        # Row 2: blueprint JSON already in B2
+        # We add row 4: customization_answers
+        ws_td["A4"] = "customization"
+        ws_td["B4"] = json.dumps(custom_json)
+        ws_td["A5"] = "experiment_id"
+        ws_td["B5"] = custom_json.get("de_experiment_id", "")
+        ws_td["A6"] = "notes"
+        ws_td["B6"] = custom_json.get("de_notes", "")
+
+    wb.save(file_path_xlsx)
+    return file_path_xlsx

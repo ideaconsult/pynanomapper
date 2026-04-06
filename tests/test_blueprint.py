@@ -178,6 +178,10 @@ def get_template_xlsx(uuid, json_blueprint):
         if layout == "dose_response": 
             df_info, df_result, df_raw, df_conditions, df_calibrate = bp.get_template_frame(
                 json_blueprint)
+            # 2. Apply blueprint defaults/customizations
+            #df_info, df_result, df_conditions = apply_blueprint_customizations(
+            #    df_info, df_result, df_conditions, json_blueprint
+            #)            
             bp.iom_format_2excel(file_path_xlsx, df_info, df_result, df_raw, df_conditions, df_calibrate)
             bp.add_plate_layout(file_path_xlsx, json_blueprint)
             json_blueprint["template_uuid"] = uuid            

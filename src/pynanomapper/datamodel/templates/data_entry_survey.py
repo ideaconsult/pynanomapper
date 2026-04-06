@@ -770,6 +770,57 @@ def blueprint_to_data_entry_survey(bp: Dict) -> Dict:
     return survey
 
 
+def apply_blueprint_customizations(df_info, df_result, df_conditions, json_blueprint):
+    """
+    Fill df_info, df_result, and df_conditions with default/custom values
+    from the blueprint before writing to Excel.
+    """
+    # --- Method metadata ---
+    method_meta = get_method_metadata(json_blueprint)
+    df_info.loc[df_info['datamodel'] == 'METHOD', 'value'] = df_info.loc[df_info['datamodel'] == 'METHOD', 'param_name'].map(
+        lambda x: method_meta.get(x, "")
+    )
+
+    # --- Sample metadata ---
+    sample_meta = get_materials_metadata(json_blueprint)
+    df_info.loc[df_info['datamodel'] == METADATA_SAMPLE_INFO, 'value'] = df_info.loc[df_info['datamodel'] == METADATA_SAMPLE_INFO, 'param_name'].map(
+        lambda x: sample_meta.get(x, "")
+    )
+
+    # --- Sample prep metadata ---
+    for prep in json_blueprint.get(METADATA_SAMPLE_PREP, []):
+        mask = df_info['param_name'] == prep.get('param_sampleprep_name')
+        df_info.loc[mask, 'value'] = prep.get('default_value', "")
+
+    # --- Parameters ---
+    for param in json_blueprint.get(METADATA_PARAMETERS, []):
+        mask = df_info['param_name'] == param.get('param_name')
+        df_info.loc[mask, 'value'] = param.get('default_value', "")
+
+    # --- Treatments ---
+    treatment_df = get_treatment(json_blueprint)
+    for idx, row in df_info.iterrows():
+        if row['param_name'] in treatment_df['param_name'].values:
+            df_info.at[idx, 'value'] = treatment_df.loc[treatment_df['param_name'] == row['param_name'], 'value'].values[0]
+
+    # --- Pre-fill results table if defaults exist ---
+    if df_result is not None:
+        for res in json_blueprint.get("question3", []):
+            mask = df_result['result_name'] == res['result_name']
+            if mask.any() and 'default_value' in res:
+                # Fill first condition column with default
+                conditions = res.get('results_conditions', [])
+                if conditions:
+                    first_cond = conditions[0]
+                    if first_cond in df_result.columns:
+                        df_result.loc[mask, first_cond] = res['default_value']
+
+    # --- Fill units in df_conditions ---
+    for idx, row in df_conditions.iterrows():
+        df_conditions.at[idx, 'condition_unit'] = row.get('condition_unit', "")
+
+    return df_info, df_result, df_conditions
+    
 # ---------------------------------------------------------------------------
 # CLI helper
 # ---------------------------------------------------------------------------
