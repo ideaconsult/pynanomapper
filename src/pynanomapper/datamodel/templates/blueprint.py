@@ -1255,6 +1255,7 @@ def _duplicate_material_columns(ws_tc, n_materials):
     """
     from openpyxl.utils import get_column_letter
     from openpyxl.formula.translate import Translator
+    from copy import copy
 
     if n_materials <= 1:
         return
@@ -1264,18 +1265,27 @@ def _duplicate_material_columns(ws_tc, n_materials):
     in_block = False
 
     # --- Locate the "Test Material Details" block ---
+    # We iterate and collect rows until we hit the NEXT explicit section header
     for row in ws_tc.iter_rows():
         a_val = row[0].value
+        a_text = str(a_val).strip() if a_val else ""
 
-        if a_val and str(a_val).strip() == "Test Material Details":
+        if a_text == "Test Material Details":
             block_start = row[0].row
             in_block = True
             continue
 
         if in_block:
-            if a_val and str(a_val).strip() and block_rows:
+            # If we find a new section header (bold/filled cell in Col A) 
+            # and we already have some rows, we stop.
+            # Adjust the condition below if your headers have a specific pattern.
+            if a_text and any(header in a_text for header in ["Results", "Raw Data", "Section"]):
                 break
-            if a_val and str(a_val).strip():
+            
+            # We include the row if there is a label OR if there is a value/formula in Col B
+            # This ensures we don't skip rows where Column A is empty but Column B has a formula
+            b_val = row[1].value
+            if a_text or b_val:
                 block_rows.append(row[0].row)
 
     if not block_rows:
@@ -1289,7 +1299,7 @@ def _duplicate_material_columns(ws_tc, n_materials):
         target_col = SOURCE_VALUE_COL + mat_idx
         target_letter = get_column_letter(target_col)
 
-        # 1. Update Header
+        # 1. Update Header Row
         if block_start is not None:
             ws_tc.cell(
                 row=block_start,
@@ -1297,14 +1307,14 @@ def _duplicate_material_columns(ws_tc, n_materials):
                 value=f"Test Material Details ({mat_idx + 1})"
             )
 
-        # 2. Copy Values and Formulas
+        # 2. Copy Values, Formulas, and Styles
         for row_num in block_rows:
             src_cell = ws_tc.cell(row=row_num, column=SOURCE_VALUE_COL)
             dst_cell = ws_tc.cell(row=row_num, column=target_col)
 
+            # Handle Formulas
             formula = _get_cell_formula(src_cell)
             if formula:
-                # Shift relative references (e.g., =A1 becomes =B1)
                 dst_cell.value = Translator(
                     formula,
                     origin=src_cell.coordinate
@@ -1312,17 +1322,13 @@ def _duplicate_material_columns(ws_tc, n_materials):
             else:
                 dst_cell.value = src_cell.value
             
-            # Optional: Copy style (borders/alignment) so dropdowns look right
+            # Essential: Copy styles (dropdown arrows and borders)
             if src_cell.has_style:
-                from copy import copy
                 dst_cell.style = copy(src_cell.style)
 
-        # 3. Duplicate Data Validations (Dropdowns)
-        # We must add the new cell coordinates to any existing validation rules
+        # 3. Duplicate Data Validations
         for dv in ws_tc.data_validations.dataValidation:
             for row_num in block_rows:
                 src_coord = f"{source_letter}{row_num}"
-                # If the source cell is part of this validation, add the target cell
                 if src_coord in dv.cells:
-                    dst_coord = f"{target_letter}{row_num}"
-                    dv.add(dst_coord)
+                    dv.add(f"{target_letter}{row_num}")
