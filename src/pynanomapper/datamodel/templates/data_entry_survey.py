@@ -240,31 +240,58 @@ def _page_identity(bp: Dict) -> Dict:
 
 
 def _page_sample(bp: Dict) -> Optional[Dict]:
-    """Page 1 – sample / material identifiers."""
+    """Page 1 – number of materials + optional example material identifiers."""
     sample_info = bp.get("METADATA_SAMPLE_INFO", [])
     if not sample_info:
         return None
 
-    elements = []
-    for i, param in enumerate(sample_info):
-        name  = param.get("param_sample_name", f"sample_param_{i}")
-        group = param.get("param_sample_group", "")
-        q = {
+    # --- How many materials question ---
+    elements = [
+        {
             "type": "text",
-            "name": f"de_sample__{_slug(name)}",
-            "title": name,
-            "description": f"Group: {group}" if group else "",
+            "inputType": "number",
+            "name": "de_material_count",
+            "title": "How many materials / samples will be tested?",
+            "description": (
+                "The Excel template will pre-populate this many material "
+                "lookup columns in the Test_conditions sheet. "
+                "You will select the actual materials from the project list inside Excel."
+            ),
+            "defaultValue": 1,
+            "min": 1,
+            "max": 50,
+            "isRequired": True,
             "startWithNewLine": True,
-            "isRequired": i == 0,   # require at least the first identifier
-        }
-        elements.append(q)
+        },
+        # --- Optional example material block (framed as guidance) ---
+        {
+            "type": "panel",
+            "name": "de_panel_sample_example",
+            "title": "Example material (optional)",
+            "description": (
+                "Filling this in will add one example row to the Materials sheet "
+                "so you can see the expected format. Leave blank to skip."
+            ),
+            "state": "collapsed",
+            "elements": [
+                {
+                    "type": "text",
+                    "name": f"de_sample__{_slug(param.get('param_sample_name', f'sample_param_{i}'))}",
+                    "title": param.get("param_sample_name", f"sample_param_{i}"),
+                    "description": f"Group: {param.get('param_sample_group', '')}" if param.get("param_sample_group") else "",
+                    "startWithNewLine": i % 2 == 0,
+                }
+                for i, param in enumerate(sample_info)
+            ],
+        },
+    ]
 
     return {
         "name": "de_page_sample",
-        "title": f"[{bp.get('METHOD','')}] Sample / Material details",
-        "description": "Fill in the identifiers for the material(s) tested.",
-        "navigationTitle": "Sample",
-        "navigationDescription": "Material identifiers",
+        "title": f"[{bp.get('METHOD','')}] Materials",
+        "description": "Specify how many materials will be tested in this experiment.",
+        "navigationTitle": "Materials",
+        "navigationDescription": "Number of materials",
         "elements": elements,
     }
 
@@ -412,25 +439,36 @@ def _page_conditions(bp: Dict) -> Optional[Dict]:
                 "startWithNewLine": True,
             }
         else:
-            # Concentration, time etc. → text with unit hint + series entry
+            # Determine label prefix from condition type: C=concentration, T=time, other=X
+            _prefix_map = {
+                "c_concentration": "C",
+                "c_time": "T",
+            }
+            prefix = _prefix_map.get(ctype, cname[0].upper() if cname else "X")
+            # Pre-generate 5 default label rows
+            default_rows = [
+                {"cond_label": f"{prefix}{i}", "cond_value": ""}
+                for i in range(1, 6)
+            ]
             q = {
                 "type": "matrixdynamic",
                 "name": f"de_condition__{_slug(cname)}",
                 "title": f"{cname} series",
                 "description": (
                     f"Type: {clabel}. "
-                    f"Enter one row per {cname} level tested."
+                    f"Labels are pre-filled as {prefix}1–{prefix}5 — edit values and remove unused rows."
                     + (f"  Unit: {cunit}" if cunit else "")
                 ),
                 "startWithNewLine": True,
-                "rowCount": 3,
+                "rowCount": 5,
                 "minRowCount": 1,
                 "confirmDelete": True,
                 "addRowText": f"Add {cname} level",
+                "defaultValue": default_rows,
                 "columns": [
                     {
                         "name": "cond_label",
-                        "title": "Label / ID",
+                        "title": f"Label (e.g. {prefix}1, {prefix}2…)",
                         "cellType": "text",
                         "isRequired": True,
                     },
@@ -648,17 +686,26 @@ def _page_calibration(bp: Dict) -> Optional[Dict]:
 
 
 def _page_submission(bp: Dict) -> Dict:
-    """Last page – submission notes."""
+    """Last page – notes and experiment identifier before generating Excel."""
+    method = bp.get("METHOD", "")
     return {
         "name": "de_page_submit",
-        "title": "Submit data entry",
+        "title": "Generate Excel template",
         "description": (
-            "Review your entries before submitting. "
-            "You can go back and correct any page."
+            "Review your entries, then click Complete to generate "
+            "the pre-filled Excel file."
         ),
-        "navigationTitle": "Submit",
-        "navigationDescription": "Review and submit",
+        "navigationTitle": "Generate Excel",
+        "navigationDescription": "Notes & generate",
         "elements": [
+            {
+                "type": "text",
+                "name": "de_experiment_id",
+                "title": "Experiment / run identifier",
+                "description": "Internal lab notebook ID or LIMS reference for this run.",
+                "isRequired": False,
+                "startWithNewLine": True,
+            },
             {
                 "type": "comment",
                 "name": "de_notes",
@@ -667,13 +714,7 @@ def _page_submission(bp: Dict) -> Dict:
                     "Any remarks about this experiment run, "
                     "deviations from protocol, QC issues, etc."
                 ),
-            },
-            {
-                "type": "text",
-                "name": "de_experiment_id",
-                "title": "Experiment / run identifier",
-                "description": "Internal lab notebook ID or LIMS reference for this run.",
-                "isRequired": True,
+                "startWithNewLine": False,
             },
         ],
     }

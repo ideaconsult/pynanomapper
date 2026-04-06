@@ -1162,10 +1162,6 @@ def write_customization_to_excel(file_path_xlsx, blueprint_json, custom_json):
     # ------------------------------------------------------------------
     if "TemplateDesigner" in wb.sheetnames:
         ws_td = wb["TemplateDesigner"]
-        # Store the customization answers so NeXus round-trip can access them
-        # Row 1: headers already present (uuid / surveyjs)
-        # Row 2: blueprint JSON already in B2
-        # We add row 4: customization_answers
         ws_td["A4"] = "customization"
         ws_td["B4"] = json.dumps(custom_json)
         ws_td["A5"] = "experiment_id"
@@ -1173,5 +1169,168 @@ def write_customization_to_excel(file_path_xlsx, blueprint_json, custom_json):
         ws_td["A6"] = "notes"
         ws_td["B6"] = custom_json.get("de_notes", "")
 
+    # ------------------------------------------------------------------
+    # 6.  Duplicate material columns based on de_material_count
+    # ------------------------------------------------------------------
+    n_materials = int(custom_json.get("de_material_count", 1) or 1)
+    if n_materials > 1 and "Test_conditions" in wb.sheetnames:
+        _duplicate_material_columns(wb["Test_conditions"], n_materials)
+
+    # ------------------------------------------------------------------
+    # 7.  Add optional example material row to Materials sheet
+    # ------------------------------------------------------------------
+    _add_example_material_to_sheet(
+        wb,
+        blueprint_json.get(METADATA_SAMPLE_INFO, []),
+        custom_json
+    )
+
     wb.save(file_path_xlsx)
     return file_path_xlsx
+
+
+def _duplicate_material_columns_almost(ws_tc, n_materials):
+    """
+    Duplicate the value column (next to 'Test Material Details' labels)
+    so that n_materials columns are present side-by-side.
+    """
+    if n_materials <= 1:
+        return
+
+    block_start = None
+    block_rows = []
+    in_block = False
+
+    for row in ws_tc.iter_rows():
+        a_val = row[0].value
+        if a_val and str(a_val).strip() == "Test Material Details":
+            block_start = row[0].row
+            in_block = True
+            continue
+        if in_block:
+            if a_val and str(a_val).strip() and block_rows:
+                break
+            if a_val and str(a_val).strip():
+                block_rows.append(row[0].row)
+
+    if not block_rows:
+        return
+
+    SOURCE_VALUE_COL = 2  # column B (the one AFTER labels)
+
+    for mat_idx in range(1, n_materials):
+        target_col = SOURCE_VALUE_COL + mat_idx
+
+        # Optional: update header
+        if block_start is not None:
+            ws_tc.cell(
+                row=block_start,
+                column=target_col,
+                value=f"Test Material Details ({mat_idx + 1})"
+            )
+
+        # Copy values from source column
+        for row_num in block_rows:
+            source_val = ws_tc.cell(row=row_num, column=SOURCE_VALUE_COL).value
+            ws_tc.cell(row=row_num, column=target_col, value=source_val)
+
+
+from openpyxl.formula.translate import Translator
+
+def _duplicate_material_columns(ws_tc, n_materials):
+    """
+    Duplicate the value column (next to 'Test Material Details' labels)
+    so that n_materials columns are present side-by-side.
+    Preserves and correctly shifts relative formulas.
+    """
+    if n_materials <= 1:
+        return
+
+    block_start = None
+    block_rows = []
+    in_block = False
+
+    # --- Locate the "Test Material Details" block ---
+    for row in ws_tc.iter_rows():
+        a_val = row[0].value
+
+        if a_val and str(a_val).strip() == "Test Material Details":
+            block_start = row[0].row
+            in_block = True
+            continue
+
+        if in_block:
+            # Stop when next section starts
+            if a_val and str(a_val).strip() and block_rows:
+                break
+
+            if a_val and str(a_val).strip():
+                block_rows.append(row[0].row)
+
+    if not block_rows:
+        return
+
+    SOURCE_VALUE_COL = 2  # column B (original values)
+
+    # --- Duplicate columns ---
+    for mat_idx in range(1, n_materials):
+        target_col = SOURCE_VALUE_COL + mat_idx
+
+        # Optional header
+        if block_start is not None:
+            ws_tc.cell(
+                row=block_start,
+                column=target_col,
+                value=f"Test Material Details ({mat_idx + 1})"
+            )
+
+        for row_num in block_rows:
+            src_cell = ws_tc.cell(row=row_num, column=SOURCE_VALUE_COL)
+            dst_cell = ws_tc.cell(row=row_num, column=target_col)
+
+            # Copy with formula translation if needed
+            if src_cell.data_type == "f":
+                dst_cell.value = Translator(
+                    src_cell.value,
+                    origin=src_cell.coordinate
+                ).translate_formula(dst_cell.coordinate)
+            else:
+                dst_cell.value = src_cell.value
+
+
+def _add_example_material_to_sheet(wb, sample_info_params, custom_json):
+    """
+    If the user filled in the optional example material fields, write one
+    example data row to the Materials sheet without changing column headers.
+    """
+    if "Materials" not in wb.sheetnames:
+        return
+
+    ws_mat = wb["Materials"]
+    example = {}
+    for param in sample_info_params:
+        name = param.get("param_sample_name", "")
+        group = param.get("param_sample_group", "")
+        slug_key = f"de_sample__{_slug(name)}"
+        value = custom_json.get(slug_key, "")
+        if value:
+            example[group] = value
+
+    if not example:
+        return
+
+    # Column positions matching get_materials_columns() (1-based):
+    # ["", "ERM identifier", "ID", "Name", "CAS", "type",
+    #  "Supplier", "Supplier code", "Batch", "Core", "BET surface in m²/g"]
+    GROUP_TO_COL = {
+        "ID":       3,
+        "NAME":     4,
+        "CASRN":    5,
+        "SUPPLIER": 7,
+        "BATCH":    9,
+    }
+    next_row = ws_mat.max_row + 1
+    for group, value in example.items():
+        col = GROUP_TO_COL.get(group)
+        if col:
+            ws_mat.cell(row=next_row, column=col, value=value)
