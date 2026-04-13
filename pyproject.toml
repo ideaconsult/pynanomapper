@@ -52,7 +52,7 @@ xlsxwriter = "^3.1.9"
 "Bug Tracker" = "https://github.com/ideaconsult/pynanomapper/issues"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
+pytest = ">=8,<10"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
