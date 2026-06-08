@@ -5,14 +5,14 @@ This roadmap describes planned development for pynanomapper in the context of th
 ## Current state (v2.3.0)
 
 - Template blueprint schema and JSON parsing (`datamodel.templates.blueprint`)
-- Excel template generation from blueprints (`claude_excel_gen.py`)
-- Excel → NeXus conversion via pyambit (`excel_to_nexus.py`)
-- Template Designer API integration (`template_designer.py`, `template_parser.py`)
+- Excel template generation from blueprints (`datamodel.templates.blueprint`)
+- Excel → NeXus conversion via pyambit (`datamodel.templates.excel_to_nexus`)
+- Template Designer SurveyJS definition and Excel parser support (`template_designer.py`, `template_parser.py`)
 - Ontology annotation for endpoints and parameters (`annotation.py`)
 - AMBIT REST API client (`client_ambit.py`)
 - Solr search layer client (`client_solr.py`)
-- HSDS/HDF5 service integration (`h5service.py`, `h5converter.py`)
-- CHARISMA/ramanchada spectral service client (`service_charisma.py`)
+- HSDS/HDF5 service integration (`clients.h5service`, `clients.h5converter`)
+- CHARISMA/ramanchada spectral service client (`clients.service_charisma`)
 - CI/CD via GitHub Actions; 3 maintainers
 
 ## Near-term (v2.4 — v2.5)

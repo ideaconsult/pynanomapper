@@ -12,14 +12,10 @@ helpers, and clients for AMBIT/Solr plus related services.
 The package is published with Poetry from `src/pynanomapper`. It depends on `pyambit` for the AMBIT/eNanoMapper data
 model and NeXus writer.
 
-## Current Documentation Caveats
+## Current Documentation Notes
 
-- PR 72 expands `README.md` and adds `ROADMAP.md`; those files are useful context but currently contain a few
-  mismatches with the checked-out code.
-- Current `README.md` and `ROADMAP.md` mention `claude_excel_gen.py`, but that file is not present. Current Excel
-  template generation is primarily in `src/pynanomapper/datamodel/templates/blueprint.py`.
-- `client_ambit.py` and `client_solr.py` are top-level modules under `src/pynanomapper/`, not files inside
-  `src/pynanomapper/clients/`.
+- PR 72 expands `README.md` and adds `ROADMAP.md`; use those files as project context alongside source code, tests,
+  `pyproject.toml`, and GitHub Actions.
 - There is currently no `.pre-commit-config.yaml` in this repository.
 
 ## Repository Layout

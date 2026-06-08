@@ -10,15 +10,15 @@ pynanomapper builds on the [pyambit](https://github.com/ideaconsult/pyambit) dat
 
 The core of the library. Implements the Template Designer blueprint schema and all data conversion pipelines:
 
-- **`blueprint.py`** — Parses JSON blueprint definitions; extracts and structures method metadata (protocol, provenance, endpoints, units, sample preparation) using the pyambit data model (`Substances`, `ProtocolApplication`). Handles the mapping between Template Designer's flexible blueprint format and the eNanoMapper substance/study/protocol hierarchy.
+- **`blueprint.py`** — Parses JSON blueprint definitions and generates styled, semantically annotated Excel templates
+  from blueprint JSON. Extracts and structures method metadata (protocol, provenance, endpoints, units, sample
+  preparation), generates nmparser configuration, and handles Template Designer blueprint embedding.
 
-- **`template_designer.py`** — Template Designer integration: reads and writes template blueprints from/to the Template Designer API and local files.
+- **`template_designer.py`** — SurveyJS definition for Template Designer blueprint creation.
 
 - **`template_parser.py`** / **`tdparser.py`** — Excel template parsing: reads filled-in Template Designer Excel files, extracts the hidden JSON blueprint from the `TemplateDesigner` sheet, and converts data entries into structured eNanoMapper records.
 
 - **`excel_to_nexus.py`** — Excel → NeXus conversion: converts Template Designer Excel files to NeXus (`.nxs`) format via [pyambit](https://github.com/ideaconsult/pyambit). Parses the embedded blueprint, converts to pyambit `Substances`/`ProtocolApplication`, and writes NeXus output using pyambit's nexus_writer. Supports flat and hierarchical NeXus organisation.
-
-- **`claude_excel_gen.py`** — Programmatic generation of styled, semantically annotated Excel templates from blueprint JSON. Produces the downloadable `.xlsx` files that researchers fill in for data entry.
 
 - **`data_entry_survey.py`** — Survey/data entry support for template-based data collection workflows.
 
@@ -28,11 +28,15 @@ The core of the library. Implements the Template Designer blueprint schema and a
 
 Dictionary-based annotation of experimental endpoints and parameters against ontology terms (ENM ontology, BioPortal). Maps free-text parameter names to controlled vocabulary URIs, supporting semantic enrichment of experimental records.
 
-### `clients/` — API and service clients
+### API and service clients
 
 - **`client_ambit.py`** — Client for the original AMBIT REST API ([api.ideaconsult.net/portal](https://api.ideaconsult.net/portal/#!/)): structured access to substances, studies, endpoints, and experimental results using the full eNanoMapper data model. Based on the OpenTox API architecture published in 2011.
 
 - **`client_solr.py`** — Client for the Solr search layer that indexes the federated eNanoMapper instances: full-text and faceted search across the consolidated dataset. Complements the AMBIT API for discovery and filtering across large collections of substances and studies.
+
+The modules above are top-level modules under `src/pynanomapper/`.
+
+The `clients/` package contains additional service integrations:
 
 - **`h5service.py`** / **`h5converter.py`** — HDF5/NeXus service integration: read and write NeXus files via HSDS (HDF5 Dynamic Data Service).
 
@@ -43,6 +47,9 @@ Dictionary-based annotation of experimental endpoints and parameters against ont
 - **`authservice.py`** — Authentication handling for eNanoMapper API access.
 
 - **`datamodel_simple.py`** — Simplified data model representations for lightweight use cases.
+
+Some service integrations require optional packages or external deployments that are not needed by the core template and
+conversion workflows.
 
 ### `units.py`
 
