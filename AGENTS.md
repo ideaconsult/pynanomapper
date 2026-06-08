@@ -20,9 +20,7 @@ model and NeXus writer.
   template generation is primarily in `src/pynanomapper/datamodel/templates/blueprint.py`.
 - `client_ambit.py` and `client_solr.py` are top-level modules under `src/pynanomapper/`, not files inside
   `src/pynanomapper/clients/`.
-- There is currently no `CONTRIBUTING.md` in this repository and no `.pre-commit-config.yaml`.
-- The `CONTRIBUTING.md` of https://github.com/ideaconsult/pyambit is useful for style and process ideas, but do not
-  copy tool claims into this repo unless the matching config exists here.
+- There is currently no `.pre-commit-config.yaml` in this repository.
 
 ## Repository Layout
 
@@ -114,6 +112,8 @@ poetry run pytest tests/test_blueprint.py
   remove them unless the task requires it.
 - If documentation and implementation disagree, verify against source code, tests, `pyproject.toml`, and GitHub Actions
   before editing.
+- When code, tests, docs, tooling, or workflows change, update `AGENTS.md` and any user-facing docs affected by the
+  change, such as `CONTRIBUTING.md`, `README.md`, or `ROADMAP.md`.
 - External service behavior may depend on AMBIT, Solr, HSDS, Keycloak, or CHARISMA deployments. Prefer unit-level tests
   and fixtures unless the user explicitly asks for live integration checks.
 
