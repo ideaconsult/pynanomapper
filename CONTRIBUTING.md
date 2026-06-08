@@ -1,6 +1,8 @@
 ## Introduction
 
-This project uses [Poetry](https://python-poetry.org/) for dependency and virtual environment management.
+This project uses [Poetry](https://python-poetry.org/) for dependency and virtual environment management. A transition
+to [uv](https://docs.astral.sh/uv/) is planned, but use Poetry until the project configuration and workflows are
+updated.
 
 ## Best practices
 

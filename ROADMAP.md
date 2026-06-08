@@ -42,6 +42,8 @@ This roadmap describes planned development for pynanomapper in the context of th
 
 ## Contributing
 
-Issues and pull requests welcome at [github.com/ideaconsult/pynanomapper](https://github.com/ideaconsult/pynanomapper). For major features please open an issue first to discuss scope and approach.
+Issues and pull requests welcome at [github.com/ideaconsult/pynanomapper](https://github.com/ideaconsult/pynanomapper).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance. For major features please open an issue first
+to discuss scope and approach.
 
 Maintainers: Nina Jeliazkova, Luchesar Iliev, Vedrin Jeliazkov (Ideaconsult Ltd.)

@@ -38,6 +38,8 @@ model and NeXus writer.
 ## Environment And Tooling
 
 - Packaging and dependency management use Poetry.
+- A transition from Poetry to `uv` is planned, but current repo configuration and CI still use Poetry. Keep commands and
+  documentation Poetry-based until the project files and workflows are changed.
 - CI uses Poetry `2.1.3`.
 - Supported Python versions in CI are `3.10`, `3.11`, `3.12`, and `3.13`.
 - `pyproject.toml` declares `python = ">=3.10,<3.14"`.
