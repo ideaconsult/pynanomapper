@@ -12,12 +12,6 @@ helpers, and clients for AMBIT/Solr plus related services.
 The package is published with Poetry from `src/pynanomapper`. It depends on `pyambit` for the AMBIT/eNanoMapper data
 model and NeXus writer.
 
-## Current Documentation Notes
-
-- PR 72 expands `README.md` and adds `ROADMAP.md`; use those files as project context alongside source code, tests,
-  `pyproject.toml`, and GitHub Actions.
-- There is currently no `.pre-commit-config.yaml` in this repository.
-
 ## Repository Layout
 
 - `src/pynanomapper/datamodel/templates/blueprint.py`: blueprint-to-Excel generation, nmparser config generation,
@@ -103,6 +97,8 @@ poetry run pytest tests/test_blueprint.py
 ## Development Guidance
 
 - Make the smallest correct change. Avoid broad cleanup or formatting churn unless requested.
+- Use `README.md` and `ROADMAP.md` as project context alongside source code, tests, `pyproject.toml`, and GitHub
+  Actions.
 - Preserve current public module paths. `src/pynanomapper/__init__.py` is empty and does not re-export APIs.
 - Be careful with generated binary fixtures (`.xlsx`, `.nxs`) and package artifacts under `dist/`; do not modify or
   remove them unless the task requires it.
