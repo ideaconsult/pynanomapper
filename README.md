@@ -93,7 +93,7 @@ The eNanoMapper/AMBIT platform was published as a distributed REST API in 2011 (
 
 ## Funding
 
-Developed across EU Horizon 2020 and Horizon Europe projects including eNanoMapper (604134), RiskGONE (814425), PINK (862444), HARMLESS (953183), CUSP (964766), MOMENTUM (953256), and the Network of Safety Clusters (NSC).
+Developed across EU Horizon 2020 and Horizon Europe projects including RiskGONE, Sbd4Nano, CHARISMA, HARMLESS, POLYRISK. 
 
 ## Citation
 
