@@ -46,4 +46,5 @@ Issues and pull requests welcome at [github.com/ideaconsult/pynanomapper](https:
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance. For major features please open an issue first
 to discuss scope and approach.
 
-Maintainers: Nina Jeliazkova, Luchesar Iliev, Vedrin Jeliazkov (Ideaconsult Ltd.)
+Maintainers: [Nina Jeliazkova](https://github.com/vedina), [Luchesar Iliev](https://github.com/kerberizer),
+[Vedrin Jeliazkov](https://github.com/vedrin) ([Ideaconsult Ltd.](https://github.com/ideaconsult))
