@@ -183,6 +183,25 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             elif c == name:
                 return c
         return None
+
+    @staticmethod
+    def _numeric_axis_values(values):
+        """Coerce axis values to numeric where the text just wraps a number.
+
+        Some workbooks label a genuinely ordinal condition as text ("Replicate
+        1", "Replicate 6") instead of storing the number. An object-dtype
+        NumPy array has no HDF5 equivalent and breaks to_nexus(), and the label
+        text carries no information the number doesn't -- so strip it here,
+        once, rather than downstream in every consumer. Values that are not
+        "text wrapping a number" are returned unchanged.
+        """
+        arr = np.asarray(values)
+        if arr.dtype.kind != "O":
+            return arr
+        extracted = pd.Series(arr).astype(str).str.extract(r"(-?\d+\.?\d*)")[0]
+        if extracted.isna().any():
+            return arr  # not uniformly numeric-with-text; keep as given
+        return extracted.astype(float).to_numpy()
     
     def df_to_nd_effectarray_multicol(
         self,
@@ -227,18 +246,25 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 aux_cols[aux] = col
 
         # --- Build axes ValueArrays dynamically ---
+        # idx_map is keyed on the RAW column values (row lookups below use
+        # those), while axes_dict stores the numeric-coerced values where
+        # possible ("Replicate 1" -> 1.0): an object-dtype axis has no HDF5
+        # equivalent, and the label text carries no information the number
+        # doesn't. The two must stay separate -- coercing axes_dict in place
+        # would break the row lookup, which still sees the raw text.
         axes_dict = {}
+        idx_map = {}
         for ax, col in axis_cols.items():
-            values = pd.unique(df[col])
+            raw_values = pd.unique(df[col])
             _unit = get_unit(col)
-            axes_dict[ax] = mx.ValueArray(values=values, unit=_unit)  # axes usually have their own units if needed
+            axes_dict[ax] = mx.ValueArray(
+                values=self._numeric_axis_values(raw_values), unit=_unit
+            )
+            idx_map[ax] = {val: i for i, val in enumerate(raw_values)}
 
         # --- Prepare nD shape ---
         axes_list = list(axes_dict.keys())
         shape = tuple(len(axes_dict[ax].values) for ax in axes_list)
-
-        # Build index maps
-        idx_map = {ax: {val: i for i, val in enumerate(axes_dict[ax].values)} for ax in axes_list}
 
         # --- Initialize main signal and auxiliary matrices ---
         signal_matrix = np.full(shape, np.nan)
@@ -451,12 +477,16 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             >>> pa = parser.to_protocol_application()
             >>> print(pa.protocol.category.code)
         """
-        # Get protocol from template metadata
+        # Get protocol from template metadata. `endpoint` is the METHOD itself
+        # ("AFIM", "Py-GC-MS") -- the field a consumer reads to know which
+        # technique produced the data -- while `guideline` stays the
+        # EXPERIMENT/SOP text (a prose description, not a method name).
         protocol = mx.Protocol(
             topcategory=self.template_json.get("PROTOCOL_TOP_CATEGORY"),
             category=mx.EndpointCategory(
                 code=self.template_json.get("PROTOCOL_CATEGORY_CODE", "")
             ),
+            endpoint=self.template_json.get("METHOD"),
             guideline=[self.template_json.get("EXPERIMENT", "")]
         )
         
@@ -500,26 +530,34 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         
         return pa
 
-    def to_substances(self) -> mx.Substances:
+    def to_substances(self, pa: mx.ProtocolApplication = None) -> mx.Substances:
         """
         Convert parsed Excel to Substances with study data.
-        
+
         Creates SubstanceRecord objects from the Materials sheet and attaches
         the protocol application as study data.
-        
+
+        Args:
+            pa: Use this ProtocolApplication instead of building a fresh one
+                via `to_protocol_application()`. Lets a caller merge several
+                files' data (e.g. independent repeat experiments) into one PA
+                first, then attach it to the Materials-sheet substances the
+                normal way.
+
         Returns:
             Substances object containing all materials with study data
-            
+
         Example:
             >>> parser = TemplateDesignerParser("template.xlsx")
             >>> substances = parser.to_substances()
             >>> print(f"Found {len(substances.substance)} substances")
         """
         substances = []
-        
+
         # Get protocol application (shared across all materials)
-        pa = self.to_protocol_application()
-        
+        if pa is None:
+            pa = self.to_protocol_application()
+
         # Parse materials from Materials sheet
         _materials_used = self.get_materials_used().iloc[0].to_numpy()
         #print(type(_materials_used), _materials_used)
@@ -533,30 +571,27 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     if id_col in material_row and pd.notna(material_row[id_col]):
                         material_id = str(material_row[id_col])
                         break
-                
+
                 if material_id is None:
                     material_id = str(uuid.uuid4())
-                
-                # Extract material name
-                material_name = None
-                material_type = None
-                for name_col in ['Name' ]:
-                    if name_col in material_row and pd.notna(material_row[name_col]):
-                        material_name = str(material_row[name_col])
-                        material_type = str(material_row["type"])
-                        break
-                
-                if material_name is None:
-                    material_name = f"Material_{idx}"
-                
+
+                # Extract material TYPE (chemical class name, e.g. "Polystyrene",
+                # is deliberately NOT used as the substance's name/publicname:
+                # dozens of catalogue entries share one chemical class, so that
+                # would collapse distinct materials -- different suppliers,
+                # batches, surface treatments -- into one identity. material_id
+                # (the catalogue ID/ERM identifier) is what is actually specific
+                # to this experiment.
+                material_type = str(material_row["type"]) if "type" in material_row and pd.notna(material_row["type"]) else None
+
                 # Create SubstanceRecord
                 substance = mx.SubstanceRecord(
                     i5uuid=material_id,
-                    name=material_name,
-                    publicname=material_name,
+                    name=material_id,
+                    publicname=material_id,
                     substanceType=material_type,  # Default, could be parameterized
                     ownerName=self.template_json.get("provenance_provider", "Unknown"),
-                    ownerUUID=str(uuid.uuid4())
+                    ownerUUID=str(uuid.uuid5(uuid.NAMESPACE_OID, material_id))
                 )
                 
                 # Clone protocol application for this substance
@@ -654,7 +689,7 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                             cond_unit = None if pd.isna(cond_unit) else cond_unit
 
                         axes_dict[cond_name] = mx.ValueArray(
-                            values=np.array(unique_vals),
+                            values=self._numeric_axis_values(unique_vals),
                             unit=cond_unit
                         )
             
@@ -674,16 +709,37 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     print(f"Warning: Could not create EffectArray for {endpoint_name}: {e}")
             else:
                 # Simple 1D data
-                values = df[endpoint_col_tuple].dropna().values
+                values = df[endpoint_col_tuple].dropna()
                 if len(values) > 0:
-                    signal = mx.ValueArray(values=np.array(values), unit=unit)
-                    effect = mx.EffectArray(
-                        endpoint=endpoint_name,
-                        endpointtype=endpoint_type,
-                        signal=signal,
-                        axes={},
-                        conditions={}
-                    )
-                    effects.append(effect)
+                    # The blueprint declares its own type ("value_text" for a
+                    # categorical result like a cell-line/matrix label,
+                    # "value_num" for a measured quantity). A text-valued
+                    # ValueArray has no HDF5 equivalent and breaks to_nexus(),
+                    # but the real reason to route on this is that the
+                    # blueprint author already said which one it is -- one
+                    # EffectRecord per distinct value for text, one EffectArray
+                    # for numeric.
+                    result_type = endpoint_meta.get("type", None)
+                    is_text = result_type == "value_text" or not pd.api.types.is_numeric_dtype(values)
+                    if is_text:
+                        for v in pd.unique(values):
+                            effects.append(
+                                mx.EffectRecord(
+                                    endpoint=endpoint_name,
+                                    endpointtype=endpoint_type,
+                                    result=mx.EffectResult(textValue=str(v), unit=unit),
+                                    conditions={},
+                                )
+                            )
+                    else:
+                        signal = mx.ValueArray(values=np.array(values.values), unit=unit)
+                        effect = mx.EffectArray(
+                            endpoint=endpoint_name,
+                            endpointtype=endpoint_type,
+                            signal=signal,
+                            axes={},
+                            conditions={}
+                        )
+                        effects.append(effect)
         
         return effects
