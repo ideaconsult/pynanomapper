@@ -171,7 +171,19 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                         params[f"{p_group}/{p_name}"] = value  # already string                    
                 else:
                     _val, _unit = self.parse_value_unit(value, p_unit)
-                    params[f"{p_group}/{p_name}"]  = mx.Value(loValue=_val, unit=_unit)
+                    # parse_value_unit falls back to returning the original
+                    # string unchanged when it cannot find a leading number
+                    # (e.g. "m/z 100" -- a unit label, not a measured
+                    # quantity). mx.Value.loValue is numeric-only, so a
+                    # non-numeric _val must be stored as a plain string
+                    # parameter instead, the same as the p_unit is None
+                    # branch above already does.
+                    if isinstance(_val, numbers.Number):
+                        params[f"{p_group}/{p_name}"] = mx.Value(
+                            loValue=_val, unit=_unit
+                        )
+                    elif not pd.isna(_val):
+                        params[f"{p_group}/{p_name}"] = _val
         return params
 
     # --- Detect actual columns in MultiIndex safely ---
@@ -222,7 +234,13 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         def get_unit(col):
             if isinstance(col, tuple) and len(col) > 1:
                 unit = col[1]
-                if unit is None or str(unit).startswith("Unnamed"):
+                # The second header level is sometimes NaN (a float), not
+                # "Unnamed: N" (a str), when a column has no unit row at all
+                # -- pd.isna() catches that; a bare `unit is None` check does
+                # not, and NaN is truthy, so returning it unchanged here used
+                # to defeat the caller's own blueprint-unit fallback (the
+                # `or` never triggered because `nan` is not falsy).
+                if unit is None or pd.isna(unit) or str(unit).startswith("Unnamed"):
                     return None
                 return unit
             return None
@@ -252,11 +270,21 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         # equivalent, and the label text carries no information the number
         # doesn't. The two must stay separate -- coercing axes_dict in place
         # would break the row lookup, which still sees the raw text.
+        #
+        # Unit precedence: the DataFrame's own MultiIndex header (get_unit)
+        # first, falling back to whatever unit the caller already resolved
+        # from the blueprint's `conditions` and passed in via the `axes_dict`
+        # parameter -- which this loop is about to overwrite. Several
+        # MOMENTUM workbooks declare a condition's unit in the blueprint
+        # (e.g. "Concentration: ug/mL") but leave the actual data table's own
+        # unit cell for that column blank; the header-only lookup silently
+        # dropped a real, known unit in that case.
+        caller_units = {ax: va.unit for ax, va in axes_dict.items()}
         axes_dict = {}
         idx_map = {}
         for ax, col in axis_cols.items():
             raw_values = pd.unique(df[col])
-            _unit = get_unit(col)
+            _unit = get_unit(col) or caller_units.get(ax)
             axes_dict[ax] = mx.ValueArray(
                 values=self._numeric_axis_values(raw_values), unit=_unit
             )
@@ -278,7 +306,22 @@ class TemplateDesignerParser(TemplateDesignerConfig):
 
         # --- Fill matrices ---
         for _, row in df.iterrows():
-            idx = tuple(idx_map[ax][row[axis_cols[ax]]] for ax in axes_list)
+            try:
+                idx = tuple(
+                    idx_map[ax][row[axis_cols[ax]]] for ax in axes_list
+                )
+            except KeyError:
+                # A row with no value on one of this endpoint's axes -- e.g. a
+                # vehicle/H2O2 control that has no `concentration` in a
+                # dose-response table -- legitimately has no cell in this
+                # signal matrix. pd.unique() keeps NaN as a distinct axis
+                # value, but dict lookup on NaN is not reliably reflexive
+                # (nan != nan), so the same "missing axis value" row can
+                # raise KeyError here rather than silently matching its own
+                # NaN. Either way the row does not belong in this endpoint's
+                # matrix: skip it rather than losing the whole EffectArray to
+                # one row.
+                continue
             signal_matrix[idx] = row[main_col]
             for aux_name, aux_col in aux_cols.items():
                 aux_matrices[aux_name][idx] = row[aux_col]
@@ -614,7 +657,19 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 substance.study = [pa_copy]
                 substances.append(substance)
         else:
-            raise Exception("No Materials sheet!")
+            # This is reachable even when the Materials sheet exists and is
+            # populated: `filtered_materials` is also empty when none of the
+            # selector's values matches an "ERM identifier" row, e.g. a
+            # workbook whose "Select item from Project Materials list" cell
+            # still holds the unfilled column-header placeholder text
+            # instead of an actual material -- a data-entry defect on the
+            # provider's side, not a missing sheet. Report both possible
+            # values so it is diagnosable from the message alone.
+            raise Exception(
+                "No material matched: 'Select item from Project Materials "
+                f"list' = {list(_materials_used)!r}, but Materials sheet "
+                f"has ERM identifiers {self.materials['ERM identifier'].tolist()!r}"
+            )
         
         return mx.Substances(substance=substances)
 
@@ -663,10 +718,22 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             
             endpoint_meta = endpoint_meta.iloc[0]
             
-            # Get unit
+            # Get unit. The second header level is sometimes NaN (float), not
+            # "Unnamed: N" (str), when a workbook's column has no unit row at
+            # all -- pd.isna() catches that case (str(nan) == "nan", which
+            # does NOT start with "Unnamed", so a plain .startswith() guard
+            # let it through). Same fix as df_to_nd_effectarray_multicol's
+            # get_unit(), which already handles both forms correctly.
             unit = None
             if isinstance(endpoint_col_tuple, tuple) and len(endpoint_col_tuple) > 1:
-                unit = endpoint_col_tuple[1] if not endpoint_col_tuple[1].startswith("Unnamed") else None
+                raw_unit = endpoint_col_tuple[1]
+                unit = (
+                    None
+                    if raw_unit is None
+                    or pd.isna(raw_unit)
+                    or str(raw_unit).startswith("Unnamed")
+                    else raw_unit
+                )
             
             # Get conditions for this endpoint
             endpoint_conditions = endpoint_meta.get("conditions", [])
@@ -720,6 +787,22 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     # EffectRecord per distinct value for text, one EffectArray
                     # for numeric.
                     result_type = endpoint_meta.get("type", None)
+                    if result_type == "value_num" and not pd.api.types.is_numeric_dtype(values):
+                        # pandas infers a whole column as object dtype the
+                        # moment ANY cell in it is non-numeric -- one "-" or
+                        # "n.d." "not measured" marker among fifty real
+                        # numbers is enough. That used to misroute every real
+                        # number in the column into text EffectRecords,
+                        # discarding them as measured data (real case: MOMENTUM
+                        # Py-GC-MS polymer-quantity columns with a stray "-"
+                        # for a below-LOQ sample). Trust the blueprint's own
+                        # declared type over pandas' dtype inference: coerce
+                        # to numeric and drop what still doesn't parse (the
+                        # marker cells themselves, same as a real NaN already
+                        # is by the .dropna() above).
+                        coerced = pd.to_numeric(values, errors="coerce")
+                        if coerced.notna().any():
+                            values = coerced.dropna()
                     is_text = result_type == "value_text" or not pd.api.types.is_numeric_dtype(values)
                     if is_text:
                         for v in pd.unique(values):
