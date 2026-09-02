@@ -847,12 +847,19 @@ def test_get_parameters_with_no_group_uses_bare_key():
     assert not any(k.startswith("None/") for k in params)
 
 
-def test_to_substances_raises_when_data_material_has_no_materials_row():
+def test_to_substances_imports_data_material_with_no_materials_row():
     """A Material value with real data (a control like "non exposed" or
     "blank", commonly not catalogued in the Materials sheet the way a real
-    test substance is) but no matching Materials-sheet row must fail
-    loudly, not silently drop its records or invent a substance for it --
-    same failure mode as "no material matched the selector" below it.
+    test substance is) but no matching Materials-sheet row is imported as a
+    minimal substance record, with a warning.
+
+    It must NOT raise: the Materials sheet lists the materials under TEST,
+    while the data table also names controls, blanks, and occasionally a
+    dose value that leaked into the Material column ("0" in MOMENTUM's LDH
+    workbooks). Refusing the workbook over one such cell throws away every
+    other material's measurements with it -- 378 good records alongside the
+    198 unmatched ones, in the case that prompted this. Import everything;
+    warn so the defect is still reported.
     """
     import pyambit.datamodel as mx
 
@@ -885,5 +892,12 @@ def test_to_substances_raises_when_data_material_has_no_materials_row():
         test_conditions=pd.DataFrame({"A": ["Select item from Project Materials list"], "B": ["CuO"]}),
     )
 
-    with pytest.raises(Exception, match="non exposed"):
-        parser.to_substances(pa=pa, convert_to_arrays=False)
+    with pytest.warns(UserWarning, match="non exposed"):
+        substances = parser.to_substances(pa=pa, convert_to_arrays=False)
+
+    # both materials present, and NOTHING dropped -- the catalogued one and
+    # the uncatalogued control each keep their own record
+    by_name = {s.publicname: s for s in substances.substance}
+    assert set(by_name) == {"CuO", "non exposed"}
+    assert len(by_name["CuO"].study[0].effects) == 1
+    assert len(by_name["non exposed"].study[0].effects) == 1

@@ -1334,20 +1334,37 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         # sampleIDs with real data but no Materials-sheet row at all --
         # give each a minimal synthetic row (same "ERM identifier" shape
         # the loop below already reads) instead of dropping their records.
+        #
+        # This must NOT raise. The Materials sheet is a hand-maintained
+        # master list of the materials under TEST; the data table also
+        # names controls and blanks ("vehicle", "DMEM", "non exposed"),
+        # and sometimes a dose value leaks into the Material column ("0" --
+        # the untreated control in MOMENTUM's LDH workbooks). Refusing the
+        # whole workbook over one such cell discards every OTHER material's
+        # measurements with it: in UM_LDHALI_IG_1 that is 198 records for
+        # the unmatched id and 378 perfectly good ones alongside. Import
+        # everything, and warn so the defect still gets reported and fixed
+        # upstream.
         _known_ids = set(
             filtered_materials["ERM identifier"].astype(str).str.strip()
         )
-        _unmatched_ids = [m for m in _materials_in_data if m not in _known_ids]
+        _unmatched_ids = sorted(m for m in _materials_in_data if m not in _known_ids)
         if _unmatched_ids:
-            # A material with real data but no Materials sheet row at all
-            # is a data-entry defect on the provider's side (the sheet is a
-            # hand-maintained master list) -- fail loudly rather than
-            # silently inventing a substance, same failure mode as "no
-            # material matched the selector" below.
-            raise Exception(
-                "Material(s) with real data have no matching row in the "
-                f"Materials sheet: {_unmatched_ids!r}. Add a row for each "
-                "to the Materials sheet before converting this workbook."
+            warnings.warn(
+                "Material(s) with real data have no row in the Materials "
+                f"sheet: {_unmatched_ids!r} -- importing them as minimal "
+                "substance records. Add a row for each (or correct the "
+                "Material column) to describe them properly.",
+                stacklevel=2,
+            )
+            synthetic = pd.DataFrame(
+                [
+                    {"ERM identifier": m, "ID": m, "Name": m, "type": None}
+                    for m in _unmatched_ids
+                ]
+            )
+            filtered_materials = pd.concat(
+                [filtered_materials, synthetic], ignore_index=True
             )
 
         # The project owns the substances; the partner that ran the assay is
