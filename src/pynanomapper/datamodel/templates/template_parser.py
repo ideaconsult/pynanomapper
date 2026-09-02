@@ -14,14 +14,17 @@ class TemplateDesignerParser(TemplateDesignerConfig):
 
     def __init__(self, xlsx_file: IO):
         self.template_json = self.parse_hidden(xlsx_file)
+        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials")
+        if self.template_json.get("template_layout") == "pchem":
+            self._init_pchem(xlsx_file)
+            return
         tc = pd.read_excel(xlsx_file, sheet_name="Test_conditions", header=None)
         tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
         self.test_conditions = tc
-        self.materials = pd.read_excel(xlsx_file, sheet_name="Materials") 
-        _data_sheets = self.template_json["data_sheets"]    
+        _data_sheets = self.template_json["data_sheets"]
         if "data_raw" in _data_sheets:
-            self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1]) 
-        else: 
+            self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1])
+        else:
             self.raw = None
         if "data_processed" in _data_sheets:
             self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
@@ -31,6 +34,44 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             self.calibration = pd.read_excel(xlsx_file, sheet_name="Calibration_TABLE", header=[0,1])
         else:
             self.calibration = None
+
+    def _init_pchem(self, xlsx_file: IO) -> None:
+        """The "pchem" layout (FTIR, SLS, XRF): one Results_TABLE holding
+        both raw and processed data (per-column `type`/`unit` in its own
+        4-level header, no separate Raw_data_TABLE), a fixed-cell
+        Provider_informations sheet instead of Test_conditions, and a
+        Measuring_conditions sheet of per-Position_ID instrument settings
+        instead of a single set of protocol parameters.
+
+        `self.test_conditions` / `self.raw` / `self.calibration` stay None --
+        that vocabulary belongs to the "dose_response" layout, and every
+        place that reads them already checks for None first.
+        """
+        self.test_conditions = None
+        self.raw = None
+        self.calibration = None
+        self.provider_info = pd.read_excel(
+            xlsx_file, sheet_name="Provider_informations", header=None
+        )
+        self.results = pd.read_excel(
+            xlsx_file, sheet_name="Results_TABLE", header=[0, 1, 2, 3]
+        )
+        measuring_conditions = pd.read_excel(
+            xlsx_file, sheet_name="Measuring_conditions", header=[0, 1, 2]
+        )
+        position_col = self.pick_column(measuring_conditions, "Position_ID")
+        self.measuring_conditions = (
+            measuring_conditions[measuring_conditions[position_col].notna()]
+            if position_col is not None
+            else measuring_conditions
+        )
+        samples = pd.read_excel(xlsx_file, sheet_name="SAMPLES", header=[0, 1])
+        material_col = self.pick_column(samples, "Material ID")
+        self.samples = (
+            samples[samples[material_col].notna()]
+            if material_col is not None
+            else samples
+        )
 
    
     def parse_value_unit(self, s, unit=None):
@@ -97,7 +138,104 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         return subset_df
 
     def get_materials_used(self):
+        if self.template_json.get("template_layout") == "pchem":
+            # No selector cell in this layout -- SAMPLES (and Results_TABLE)
+            # are already keyed directly by Material ID, so the materials
+            # actually used are exactly the distinct values that appear
+            # there, same shape contract as the dose_response branch below
+            # (a single-row frame; to_substances() reads .iloc[0]).
+            col = self.pick_column(self.samples, "Material ID")
+            values = self.samples[col].dropna().unique() if col is not None else []
+            return pd.DataFrame([values])
         return self._get_rows_from_match(self.test_conditions, "Select item from Project Materials list", n_rows=1)
+
+    def _provider_cell(self, row: int, col: int):
+        """One 0-indexed (row, col) cell of Provider_informations (the
+        pchem-layout equivalent of Test_conditions), or None if the sheet is
+        absent, too small, or the cell is blank. Cell addresses match
+        blueprint.py's pchem_format_2excel, which writes these fixed
+        addresses when generating the sheet.
+        """
+        info = getattr(self, "provider_info", None)
+        if info is None or row >= info.shape[0] or col >= info.shape[1]:
+            return None
+        value = info.iat[row, col]
+        return None if pd.isna(value) else str(value).strip()
+
+    def get_project_name(self):
+        """The project the data belongs to.
+
+        dose_response: cell A1 of Test_conditions. pchem: cell B6 of
+        Provider_informations ("Project").
+
+        Either way this is the OWNER of the substances a workbook reports
+        on: the individual partner ran the assay, but the material and the
+        data belong to the project. Returns None when the sheet has no such
+        header.
+        """
+        if self.template_json.get("template_layout") == "pchem":
+            return self._provider_cell(5, 1)
+        if self.test_conditions is None or self.test_conditions.empty:
+            return None
+        value = self.test_conditions.iloc[0, 0]
+        return None if pd.isna(value) else str(value).strip()
+
+    def get_partner(self):
+        """The partner that actually ran the assay.
+
+        dose_response: the row labelled "Partner conducting test/assay" in
+        Test_conditions. pchem: cell B8 of Provider_informations
+        ("Partner").
+
+        This is who the data is CITED to, as opposed to the project that owns
+        it (see get_project_name).
+        """
+        if self.template_json.get("template_layout") == "pchem":
+            return self._provider_cell(7, 1)
+        row = self._get_rows_from_match(
+            self.test_conditions, "Partner conducting test/assay"
+        )
+        if row.empty:
+            return None
+        value = row.iloc[0, 0]
+        return None if pd.isna(value) else str(value).strip()
+
+    def get_work_package(self):
+        """The project work package the assay belongs to.
+
+        dose_response: the row labelled "Project Work Package" in
+        Test_conditions (e.g. "WP4"). pchem: cell B7 of
+        Provider_informations ("Workpackage").
+        """
+        if self.template_json.get("template_layout") == "pchem":
+            return self._provider_cell(6, 1)
+        row = self._get_rows_from_match(
+            self.test_conditions, "Project Work Package"
+        )
+        if row.empty:
+            return None
+        value = row.iloc[0, 0]
+        return None if pd.isna(value) else str(value).strip()
+
+    def get_start_year(self):
+        """The year the assay was run -- from the "Test start date" row of
+        Test_conditions.
+
+        These are unpublished lab records, so there is no publication year;
+        the date the work was done is the meaningful one to cite them by.
+        Provider_informations (pchem) carries no equivalent date field, so
+        this always returns None for that layout.
+        """
+        if self.template_json.get("template_layout") == "pchem" or self.test_conditions is None:
+            return None
+        row = self._get_rows_from_match(self.test_conditions, "Test start date")
+        if row.empty:
+            return None
+        value = row.iloc[0, 0]
+        if pd.isna(value):
+            return None
+        parsed = pd.to_datetime(value, errors="coerce")
+        return None if pd.isna(parsed) else int(parsed.year)
 
     def get_protocol_application(self):
         # Define Protocol from template metadata
@@ -126,6 +264,13 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         pd.DataFrame
             c_df with an additional column 'col_letter' containing Excel letters.
         """
+        # An empty `conditions`/endpoints declaration (a template with none
+        # of that kind) makes c_df a zero-column frame with no "name" column
+        # at all -- nothing to look up, return it unchanged rather than
+        # crash on c_df["name"].
+        if "name" not in c_df.columns:
+            return c_df
+
         # Build mapping from column names to Excel letters
         name_to_letter = {}
         for i, col in enumerate(cols_array):
@@ -149,6 +294,8 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         return df
 
     def get_parameters(self):
+        if self.template_json.get("template_layout") == "pchem":
+            return self._get_pchem_parameters()
         params = {}
         # 5. Add metadata parameters
         for tag in ["METADATA_PARAMETERS", "METADATA_SAMPLE_PREP"]:
@@ -197,23 +344,40 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         return None
 
     @staticmethod
-    def _numeric_axis_values(values):
-        """Coerce axis values to numeric where the text just wraps a number.
+    def _column_looks_numeric(values, threshold: float = 0.9) -> bool:
+        """True if at least `threshold` of the non-null values in `values`
+        parse as numbers.
 
-        Some workbooks label a genuinely ordinal condition as text ("Replicate
-        1", "Replicate 6") instead of storing the number. An object-dtype
-        NumPy array has no HDF5 equivalent and breaks to_nexus(), and the label
-        text carries no information the number doesn't -- so strip it here,
-        once, rather than downstream in every consumer. Values that are not
-        "text wrapping a number" are returned unchanged.
+        Used to override a template's `value_text` declaration for an
+        endpoint whose unit alone cannot tell a real unit ("mL") from an
+        enum list packed into the unit field ("Strainer/Flow-through/
+        Total") -- both are just non-empty strings. Real case: a "Volume"
+        endpoint declared value_text with unit "mL", whose actual recorded
+        values were plain numbers (0.2, 0.022, ...) -- written through as
+        digit strings under EffectResult.textValue, that value then broke
+        the NeXus write entirely (nexus_writer force-casts anything named
+        "textValue" to string dtype and cannot write a float array through
+        that path). The recorded values themselves settle what the
+        declared unit cannot.
         """
-        arr = np.asarray(values)
-        if arr.dtype.kind != "O":
-            return arr
-        extracted = pd.Series(arr).astype(str).str.extract(r"(-?\d+\.?\d*)")[0]
-        if extracted.isna().any():
-            return arr  # not uniformly numeric-with-text; keep as given
-        return extracted.astype(float).to_numpy()
+        values = pd.Series(values).dropna()
+        if values.empty:
+            return False
+        numeric = pd.to_numeric(values, errors="coerce")
+        return numeric.notna().mean() > threshold
+
+    @staticmethod
+    def _numeric_axis_values(values):
+        """Coerce axis values to numeric where the text just wraps a number
+        ("Replicate 1" -> 1.0); anything else is returned unchanged.
+
+        The implementation now lives in pyambit.datamodel.numeric_axis_values,
+        beside the record->array conversion that is the real consumer of the
+        rule. pyambit cannot import pynanomapper (the dependency runs the
+        other way, see pyambit/units.py), so it moved down rather than being
+        duplicated; this stays as the parser's own name for it.
+        """
+        return mx.numeric_axis_values(values)
     
     def df_to_nd_effectarray_multicol(
         self,
@@ -240,7 +404,20 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 # not, and NaN is truthy, so returning it unchanged here used
                 # to defeat the caller's own blueprint-unit fallback (the
                 # `or` never triggered because `nan` is not falsy).
-                if unit is None or pd.isna(unit) or str(unit).startswith("Unnamed"):
+                #
+                # A real unit cell is always text -- when a workbook is
+                # missing its units header row entirely, pandas reads the
+                # first DATA row as that second level instead, and whatever
+                # ended up under this particular column can be anything
+                # (e.g. an int like 24). Not a str -> not a unit, same
+                # verdict as NaN, rather than crashing mx.ValueArray(unit=...)
+                # (which requires a str) on a stray data value.
+                if (
+                    unit is None
+                    or pd.isna(unit)
+                    or not isinstance(unit, str)
+                    or unit.startswith("Unnamed")
+                ):
                     return None
                 return unit
             return None
@@ -271,20 +448,23 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         # doesn't. The two must stay separate -- coercing axes_dict in place
         # would break the row lookup, which still sees the raw text.
         #
-        # Unit precedence: the DataFrame's own MultiIndex header (get_unit)
-        # first, falling back to whatever unit the caller already resolved
-        # from the blueprint's `conditions` and passed in via the `axes_dict`
-        # parameter -- which this loop is about to overwrite. Several
-        # MOMENTUM workbooks declare a condition's unit in the blueprint
-        # (e.g. "Concentration: ug/mL") but leave the actual data table's own
-        # unit cell for that column blank; the header-only lookup silently
-        # dropped a real, known unit in that case.
+        # Unit precedence: the caller's blueprint-resolved unit (passed in
+        # via the `axes_dict` parameter, which this loop is about to
+        # overwrite) FIRST, falling back to the DataFrame's own MultiIndex
+        # header (get_unit) only when the blueprint declares none. The
+        # blueprint is the trusted schema -- it says what a condition's unit
+        # actually is -- while a data table's own unit cell is exactly the
+        # thing repeatedly found corrupted across this corpus (blank, an int
+        # that leaked from a missing-header-row-consumed data row, or even a
+        # plausible-looking but WRONG string like a stray "Replicate 1" for
+        # the same reason). Preferring the header would then silently prefer
+        # garbage over a unit the blueprint already got right.
         caller_units = {ax: va.unit for ax, va in axes_dict.items()}
         axes_dict = {}
         idx_map = {}
         for ax, col in axis_cols.items():
             raw_values = pd.unique(df[col])
-            _unit = get_unit(col) or caller_units.get(ax)
+            _unit = caller_units.get(ax) or get_unit(col)
             axes_dict[ax] = mx.ValueArray(
                 values=self._numeric_axis_values(raw_values), unit=_unit
             )
@@ -508,10 +688,24 @@ class TemplateDesignerParser(TemplateDesignerConfig):
     def parse_calibration(self):
         return None
 
-    def to_protocol_application(self) -> mx.ProtocolApplication:
+    def to_protocol_application(
+        self,
+        convert_to_arrays: bool = True,
+        text_conditions: List[str] = None,
+        share_conditions: dict = None,
+    ) -> mx.ProtocolApplication:
         """
         Convert parsed Excel template to AMBIT ProtocolApplication.
-        
+
+        Args:
+            convert_to_arrays: assemble the parsed EffectRecords into
+                EffectArrays via convert_effectrecords2array(). Pass False to
+                get the flat EffectRecord form instead -- that is the AMBIT
+                interchange representation: it serializes to JSON as-is, so
+                it can be dumped for verification or handed to the original
+                AMBIT importers, neither of which an assembled array grid
+                supports.
+
         Returns:
             ProtocolApplication object with protocol, parameters, and effects
             
@@ -536,26 +730,57 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         # Get parameters
         parameters = self.get_parameters()
         
-        # Parse effects from raw and processed data
+        # Parse effects from raw and processed data.
+        #
+        # Both tables are flattened to plain EffectRecords -- one per data row
+        # per endpoint, carrying that row's declared conditions -- and NOT
+        # assembled into EffectArrays here. Building the nD signal grid (and
+        # splitting it on categorical conditions) is exactly what
+        # ProtocolApplication.convert_effectrecords2array() already does for
+        # every pyambit consumer: it groups by endpointtype/endpoint/unit,
+        # detects string-only condition columns (find_string_only_columns),
+        # splits into one EffectArray per distinct combination of those
+        # (split_df_by_columns), and strips text that just wraps a number
+        # ("Replicate 1" -> 1) via transform_array. Duplicating any of that
+        # here would be a second, divergent implementation of the same rules.
+        #
+        # The flat EffectRecord list is also the AMBIT interchange
+        # representation -- it round-trips to JSON, so a template's parse can
+        # be dumped for verification or fed to the original AMBIT Java
+        # importers, which an EffectArray grid cannot be.
         effects = []
-        
-        if self.raw is not None:
-            raw_effects = self._parse_effects_from_dataframe(
-                df=self.raw,
-                endpoints_df=self.get_endpoints_df_raw(),
-                conditions_df=self.get_condition_df(),
-                endpoint_type="RAW_DATA"
+
+        if self.template_json.get("template_layout") == "pchem":
+            # One Results_TABLE holds both raw and processed data already
+            # tagged per column (see _parse_effects_from_pchem) -- there is
+            # no separate Raw_data_TABLE/Results_TABLE split to iterate.
+            effects.extend(
+                self._parse_effects_from_pchem(text_conditions=text_conditions)
             )
-            effects.extend(raw_effects)
-        
-        if self.results is not None:
-            result_effects = self._parse_effects_from_dataframe(
-                df=self.results,
-                endpoints_df=self.get_endpoints_df_results(),
-                conditions_df=self.get_condition_df(),
-                endpoint_type="AGGREGATED"
-            )
-            effects.extend(result_effects)
+        else:
+            if self.raw is not None:
+                effects.extend(
+                    self._parse_effects_from_dataframe(
+                        df=self.raw,
+                        endpoints_df=self.get_endpoints_df_raw(),
+                        conditions_df=self.get_condition_df(),
+                        endpoint_type="RAW_DATA",
+                        text_conditions=text_conditions,
+                        share_conditions=share_conditions,
+                    )
+                )
+
+            if self.results is not None:
+                effects.extend(
+                    self._parse_effects_from_dataframe(
+                        df=self.results,
+                        endpoints_df=self.get_endpoints_df_results(),
+                        conditions_df=self.get_condition_df(),
+                        endpoint_type="AGGREGATED",
+                        text_conditions=text_conditions,
+                        share_conditions=share_conditions,
+                    )
+                )
         # Create ProtocolApplication
         pa = mx.ProtocolApplication(
             protocol=protocol,
@@ -565,15 +790,304 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             investigation_uuid=self.template_json.get("investigation_uuid", str(uuid.uuid4())),
             assay_uuid=self.template_json.get("assay_uuid", str(uuid.uuid4())),
             citation=mx.Citation(
-                owner=self.template_json.get("provenance_provider", "Unknown"),
-                title=self.template_json.get("EXPERIMENT", "Template Designer Export"),
-                year=None
+                owner=(
+                    self.get_partner()
+                    or self.template_json.get("provenance_provider")
+                    or "Unknown"
+                ),
+                title=(
+                    self.get_work_package()
+                    or self.template_json.get("EXPERIMENT")
+                    or "Template Designer Export"
+                ),
+                year=self.get_start_year()
             )
         )
-        
+
+        # Grid-build/split the flat records into EffectArrays, in the one
+        # shared place that knows how (see comment above).
+        if convert_to_arrays:
+            pa.effects, _ = pa.convert_effectrecords2array()
+
         return pa
 
-    def to_substances(self, pa: mx.ProtocolApplication = None) -> mx.Substances:
+    def _get_pchem_parameters(self) -> dict:
+        """File-level parameters for the pchem layout, from the first
+        populated row of Measuring_conditions.
+
+        Measuring_conditions is keyed by Position_ID -- instrument settings
+        genuinely can vary per position -- but ProtocolApplication.parameters
+        is one flat dict for the whole file, with nowhere to attach a value
+        per position. Taking the first row is a real simplification (see
+        AGENTS.md); most of this corpus's pchem workbooks use one instrument
+        configuration throughout, so it is usually also the only row.
+        Naming matches tdparser.py's TemplateParserPChem.get_parameters
+        ("{group}/{name}", lowercased) for consistency with that prior
+        implementation of the same idea.
+        """
+        params = {}
+        table = getattr(self, "measuring_conditions", None)
+        if table is None or table.empty:
+            return params
+        row = table.iloc[0]
+        for col in table.columns:
+            if not isinstance(col, tuple) or col[0] != "METADATA_PARAMETERS":
+                continue
+            group, name = col[1], col[2]
+            value = row[col]
+            if pd.isna(value):
+                continue
+            params[f"{str(group).lower()}/{str(name).lower()}"] = value
+        return params
+
+    def _parse_effects_from_pchem(
+        self, text_conditions: List[str] = None
+    ) -> List[mx.EffectRecord]:
+        """Flatten pchem's single Results_TABLE into plain EffectRecords --
+        the same flat-record contract _parse_effects_from_dataframe produces
+        for dose_response, so to_substances() and
+        convert_effectrecords2array() work unchanged regardless of layout.
+
+        Results_TABLE already self-describes each column's endpoint name,
+        aggregate/type tag and unit in its own 4-level header (see
+        _init_pchem), generated straight from the SAME raw_data_report /
+        question3 / conditions blueprint sections dose_response uses --
+        reused here via _get_endpoints_df() and get_condition_df() rather
+        than re-deriving endpoint/condition metadata a second way.
+
+        `text_conditions` (same override as the dose_response branch, kept
+        under its original name though it is no longer only about text)
+        names raw_data_report endpoints that are actually the x-axis of the
+        OTHER endpoints in the same row, but which the blueprint declares as
+        a plain endpoint rather than a condition. Real case: FTIR/SLS declare
+        "Wavenumber (cm-1)"/"Wavelength" as their own RAW_DATA endpoint, with
+        no raw_conditions on "Transmission"/"Number"/"Volume" pointing at it
+        -- every spectrum then wrote as several independent scalar series
+        instead of one signal plotted against its axis.
+        """
+        effects: List[mx.EffectRecord] = []
+        df = self.results
+        if df is None:
+            return effects
+
+        material_col = self.pick_column(df, "Material ID")
+        position_col = self.pick_column(df, "Position_ID")
+
+        endpoints = pd.concat(
+            [
+                self._get_endpoints_df(tag="raw_data_report"),
+                self._get_endpoints_df(tag="question3"),
+            ],
+            ignore_index=True,
+        )
+        endpoint_meta = {
+            row["name"]: row for _, row in endpoints.iterrows() if "name" in row
+        }
+        condition_units = self._condition_units(self.get_condition_df())
+        condition_names = set(condition_units)
+        promoted = set(text_conditions or [])
+
+        endpoint_cols = []
+        condition_cols = {}
+        for col in df.columns:
+            if col in (material_col, position_col) or not isinstance(col, tuple):
+                continue
+            top, name = col[0], col[1]
+            if top == "Experimental factors" and name in condition_names:
+                condition_cols[name] = col
+            elif name in promoted and name in endpoint_meta:
+                # Promoted to a condition of every other endpoint in the
+                # row -- its own declared unit, not looked up in
+                # condition_units (the blueprint never listed it there).
+                condition_cols[name] = col
+                promoted_unit = endpoint_meta[name].get("unit")
+                condition_units.setdefault(
+                    name, None if pd.isna(promoted_unit) else promoted_unit
+                )
+            elif name in endpoint_meta:
+                endpoint_cols.append((name, col))
+            # else: a column the blueprint declared but never gave data for
+            # in this particular workbook (e.g. an unused "Results" slot) --
+            # nothing to attach it to.
+
+        # A value_text endpoint whose recorded values are nearly all numbers
+        # anyway is trusted as numeric -- same override as the dose_response
+        # branch (_column_looks_numeric's own docstring has the real case:
+        # "Volume" declared value_text with unit "mL", genuinely 0.2/0.022/...
+        # throughout). Computed once per endpoint column, not per row.
+        text_endpoints = {
+            name
+            for name, col in endpoint_cols
+            if endpoint_meta[name].get("type") == "value_text"
+            and not self._column_looks_numeric(df[col])
+        }
+
+        for idx in df.index:
+            material = (
+                None
+                if material_col is None or pd.isna(df.at[idx, material_col])
+                else str(df.at[idx, material_col]).strip()
+            )
+
+            conditions = {}
+            for cond_name, cond_col in condition_cols.items():
+                raw = df.at[idx, cond_col]
+                if pd.isna(raw):
+                    continue
+                numeric = pd.to_numeric(raw, errors="coerce")
+                cond_unit = condition_units.get(cond_name)
+                conditions[cond_name] = (
+                    mx.Value(loValue=float(numeric), unit=cond_unit)
+                    if not pd.isna(numeric)
+                    else str(raw)
+                )
+
+            for name, col in endpoint_cols:
+                value = df.at[idx, col]
+                if pd.isna(value):
+                    continue
+                meta = endpoint_meta[name]
+                unit = meta.get("unit")
+                unit = None if pd.isna(unit) else unit
+                endpoint_type = meta.get("aggregate")
+                endpoint_type = None if pd.isna(endpoint_type) else endpoint_type
+
+                # The template says whether an endpoint is a number or text
+                # ("value_num" / "value_text"); same rule as the
+                # dose_response branch, including the same one override --
+                # see text_endpoints above.
+                if name in text_endpoints:
+                    # A value_text endpoint's "unit" cell is not a physical
+                    # unit -- real workbooks pack the field's allowed
+                    # categories in it instead (e.g. "Fraction" carries
+                    # "Strainer/Flow-through/Total", "Leachate" carries
+                    # "Yes/No"). Attaching that as EffectResult.unit made it
+                    # show up as the axis's NeXus `units` attribute, which is
+                    # simply wrong -- "Strainer/Flow-through/Total" is not a
+                    # unit "Total" is measured in.
+                    result = mx.EffectResult(textValue=str(value), unit=None)
+                else:
+                    numeric_value = pd.to_numeric(value, errors="coerce")
+                    if pd.isna(numeric_value):
+                        continue
+                    result = mx.EffectResult(loValue=float(numeric_value), unit=unit)
+
+                effects.append(
+                    mx.EffectRecord(
+                        endpoint=name,
+                        endpointtype=endpoint_type,
+                        result=result,
+                        conditions=dict(conditions),
+                        sampleID=material,
+                    )
+                )
+
+        return effects
+
+    @staticmethod
+    def _axes_match(a: mx.EffectArray, b: mx.EffectArray) -> bool:
+        """True if two EffectArrays were built over the same axes -- same
+        names, same values -- i.e. they measure the same rows and can share
+        one NXdata as signal + auxiliary signal."""
+        a_axes, b_axes = (a.axes or {}), (b.axes or {})
+        if set(a_axes) != set(b_axes):
+            return False
+        for name, a_axis in a_axes.items():
+            b_axis = b_axes[name]
+            a_values = np.asarray(a_axis.values)
+            b_values = np.asarray(b_axis.values)
+            if a_values.shape != b_values.shape:
+                return False
+            if a_values.dtype.kind in "fiu" and b_values.dtype.kind in "fiu":
+                if not np.allclose(
+                    a_values.astype(float), b_values.astype(float), equal_nan=True
+                ):
+                    return False
+            elif not np.array_equal(a_values, b_values):
+                return False
+        return True
+
+    def _merge_auxiliary_signals(
+        self, effects: List[mx.EffectRecord], primary_to_aux: dict
+    ) -> List[mx.EffectRecord]:
+        """Fold each of `primary_to_aux[primary]`'s arrays into `primary`'s
+        own array as an auxiliary signal, for one already-assembled EffectArray
+        list (i.e. called after convert_effectrecords2array()).
+
+        A primary/aux pair might have been split into several EffectArrays
+        each (a categorical condition neither declares as such, say) -- match
+        each primary to its aux candidate structurally, by shared
+        `conditions` and `axes`, rather than assuming there is exactly one of
+        each and they already line up.
+        """
+        # Keyed by stripped endpoint name: MOMENTUM endpoint names routinely
+        # carry incidental trailing whitespace ("Concentration bacteria "),
+        # and a primary_to_aux entry that silently fails to match here would
+        # just leave every candidate unmerged with no error at all.
+        by_endpoint: dict = {}
+        for effect in effects:
+            by_endpoint.setdefault((effect.endpoint or "").strip(), []).append(effect)
+
+        consumed = set()
+        for primary_name, aux_names in primary_to_aux.items():
+            for primary in by_endpoint.get(primary_name.strip(), []):
+                if getattr(primary, "signal", None) is None:
+                    continue
+                auxiliary = dict(primary.signal.auxiliary or {})
+                for aux_name in aux_names:
+                    for candidate in by_endpoint.get(aux_name.strip(), []):
+                        if (
+                            id(candidate) in consumed
+                            or getattr(candidate, "signal", None) is None
+                        ):
+                            continue
+                        if candidate.conditions == primary.conditions and (
+                            self._axes_match(primary, candidate)
+                        ):
+                            # A candidate that is itself purely categorical
+                            # (no loValue/upValue anywhere, only textValue --
+                            # see _parse_effects_from_dataframe's
+                            # is_text_endpoint) has NO real content in its
+                            # own signal: create_multidimensional_matrix
+                            # never lets textValue become the primary
+                            # signal_col, so that signal is an all-NaN
+                            # placeholder and the real values are one level
+                            # down, in ITS OWN textValue auxiliary. Fold
+                            # THAT in under aux_name, not the empty
+                            # placeholder, when it has one.
+                            own_text = (candidate.signal.auxiliary or {}).get(
+                                "textValue"
+                            )
+                            if own_text is not None:
+                                # create_multidimensional_matrix's own
+                                # aux dict holds plain ndarrays, not
+                                # ValueArray -- nexus_writer treats a bare
+                                # ndarray as unit-less and borrows the
+                                # PRIMARY signal's unit for it (a real,
+                                # separately-fixed bug elsewhere this
+                                # session: "a plain ValueArray fell
+                                # through to the ndarray branch"). Wrap it
+                                # so the merged-in aux keeps its own
+                                # declared unit, not Concentration
+                                # bacteria's CFU/mL.
+                                auxiliary[aux_name] = mx.ValueArray(
+                                    values=own_text, unit=candidate.signal.unit
+                                )
+                            else:
+                                auxiliary[aux_name] = candidate.signal
+                            consumed.add(id(candidate))
+                            break
+                if auxiliary:
+                    primary.signal.auxiliary = auxiliary
+
+        return [e for e in effects if id(e) not in consumed]
+
+    def to_substances(
+        self,
+        pa: mx.ProtocolApplication = None,
+        aux_signals: dict = None,
+        convert_to_arrays: bool = True,
+    ) -> mx.Substances:
         """
         Convert parsed Excel to Substances with study data.
 
@@ -585,7 +1099,30 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 via `to_protocol_application()`. Lets a caller merge several
                 files' data (e.g. independent repeat experiments) into one PA
                 first, then attach it to the Materials-sheet substances the
-                normal way.
+                normal way. Per-substance routing (by EffectRecord.sampleID)
+                only works when `pa.effects` is still the flat EffectRecord
+                form -- pass it as built by
+                to_protocol_application(convert_to_arrays=False), not
+                pre-converted, or every substance gets the whole file's data
+                again (an EffectArray carries no sampleID to route by).
+            aux_signals: {primary_endpoint: [aux_endpoint, ...]} -- fold each
+                aux endpoint's array into the primary's as an auxiliary
+                signal (one NXdata instead of two) when both share the same
+                conditions and axes -- i.e. they are two views of the same
+                measurement (e.g. SLS's Number/Volume distribution over the
+                same Wavelength bins). No template field declares this
+                relationship, so it cannot be inferred; it is a per-dataset
+                override like `text_conditions`, applied after
+                convert_effectrecords2array() has built the independent
+                arrays. See _merge_auxiliary_signals. Ignored when
+                convert_to_arrays is False (nothing to merge yet).
+            convert_to_arrays: assemble each substance's own flat
+                EffectRecords into EffectArrays (grid-building, categorical
+                splitting -- see convert_effectrecords2array). Pass False to
+                keep the flat, per-substance-ROUTED EffectRecord form -- the
+                AMBIT interchange representation (see
+                to_protocol_application's own convert_to_arrays), still
+                correctly split by material, just not yet grid-built.
 
         Returns:
             Substances object containing all materials with study data
@@ -601,10 +1138,40 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         if pa is None:
             pa = self.to_protocol_application()
 
-        # Parse materials from Materials sheet
-        _materials_used = self.get_materials_used().iloc[0].to_numpy()
-        #print(type(_materials_used), _materials_used)
-        filtered_materials = self.materials[self.materials["ERM identifier"].isin(_materials_used)]
+        # Parse materials from Materials sheet. Stripped on both sides before
+        # matching -- the selector cell (Test_conditions) and the Materials
+        # sheet's own "ERM identifier" column are two separately hand-filled
+        # areas of the workbook, and incidental whitespace on either one
+        # ("TiO2 " vs "TiO2") must not silently drop that material from the
+        # file's substances entirely.
+        _materials_used = [
+            str(m).strip() for m in self.get_materials_used().iloc[0].to_numpy()
+        ]
+        filtered_materials = self.materials[
+            self.materials["ERM identifier"].astype(str).str.strip().isin(_materials_used)
+        ]
+
+        # The project owns the substances; the partner that ran the assay is
+        # who the study is cited to AND who nexus_writer records as the
+        # sample's provider (papp.owner.company.name -> sample/provider) --
+        # both read from the same cell (B8, "Partner", in Provider_
+        # informations for pchem), same as citation.owner.
+        owner_name = (
+            self.get_project_name()
+            or self.template_json.get("provenance_provider")
+            or "Unknown"
+        )
+        provider_name = self.get_partner() or owner_name
+
+        # True if ANY record carries a sampleID -- i.e. the source table had
+        # a "Material" column at all. See the per-substance filtering below:
+        # when it's False (e.g. Py-GC-MS, whose "materials" are reference
+        # standards quantified in every run, not one per row), every record
+        # stays available to every substance, since there is nothing to
+        # route by.
+        has_material_column = any(
+            getattr(effect, "sampleID", None) is not None for effect in pa.effects
+        )
 
         if filtered_materials is not None and not filtered_materials.empty:
             for idx, material_row in filtered_materials.iterrows():
@@ -612,7 +1179,15 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 material_id = None
                 for id_col in ['ID', 'ERM identifier' ]:
                     if id_col in material_row and pd.notna(material_row[id_col]):
-                        material_id = str(material_row[id_col])
+                        # Stripped to match the row-level Material value in
+                        # _parse_effects_from_dataframe's sampleID (also
+                        # stripped) -- the Materials sheet and the raw/
+                        # results table are two separately hand-filled
+                        # areas of the same workbook, and incidental
+                        # leading/trailing whitespace on one side ("CuO "
+                        # vs "CuO") must not break routing a substance's
+                        # own data to it.
+                        material_id = str(material_row[id_col]).strip()
                         break
 
                 if material_id is None:
@@ -633,26 +1208,69 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     name=material_id,
                     publicname=material_id,
                     substanceType=material_type,  # Default, could be parameterized
-                    ownerName=self.template_json.get("provenance_provider", "Unknown"),
-                    ownerUUID=str(uuid.uuid5(uuid.NAMESPACE_OID, material_id))
+                    ownerName=owner_name,
+                    # Derived from the OWNER, not from the material: every
+                    # substance a project owns has to resolve to the same
+                    # owner, otherwise each material looks like its own
+                    # separate owner downstream.
+                    ownerUUID=str(uuid.uuid5(uuid.NAMESPACE_OID, owner_name))
                 )
                 
-                # Clone protocol application for this substance
-                # Each substance gets its own PA with the same data
+                # Clone protocol application for this substance -- with only
+                # ITS OWN effects, not the whole file's. A row-level table
+                # commonly reports several materials at once (a dose series,
+                # its vehicle control, a shared calibration curve, ...); every
+                # EffectRecord carries which one it is about in `sampleID`
+                # (see _parse_effects_from_dataframe), so route on that
+                # instead of attaching the same effects list to every
+                # substance. `has_material_column` distinguishes "this record
+                # is not about any one material" (no Material column in the
+                # table at all -- keep it for every substance, e.g. Py-GC-MS
+                # polymer-standard quantities that legitimately apply across
+                # every run) from "this record belongs to a DIFFERENT
+                # material" (drop it).
+                own_effects = [
+                    effect
+                    for effect in pa.effects
+                    if not has_material_column
+                    or getattr(effect, "sampleID", None) in (None, material_id)
+                ]
                 pa_copy = mx.ProtocolApplication(
                     protocol=pa.protocol,
-                    effects=pa.effects,
+                    effects=own_effects,
                     parameters=pa.parameters,
                     uuid=str(uuid.uuid4()),
                     investigation_uuid=pa.investigation_uuid,
                     assay_uuid=pa.assay_uuid,
                     citation=pa.citation,
+                    # nexus_writer.to_nexus uses this directly for the
+                    # written entry's group name and NXdata title in place of
+                    # the default "{provider}_{uuid}" -- a readable material
+                    # id there beats an opaque uuid, and disambiguates entries
+                    # from different substances in the same corpus folder.
+                    nx_name=material_id,
                     owner=mx.SampleLink(
                         substance=mx.Sample(uuid=material_id),
-                        company=mx.Company(name=substance.ownerName)
+                        company=mx.Company(name=provider_name)
                     )
                 )
-                
+                if any(isinstance(e, mx.EffectArray) for e in own_effects):
+                    # Records were already assembled into arrays before this
+                    # ran (convert_to_arrays=True on to_protocol_application) --
+                    # an array no longer carries a single row's sampleID, so
+                    # per-material filtering was not possible; only the
+                    # flat-record form supports it (see
+                    # to_protocol_application). This method's own
+                    # convert_to_arrays applies to the ALREADY-routed records
+                    # below, not this (already too late) case.
+                    pass
+                elif own_effects and convert_to_arrays:
+                    pa_copy.effects, _ = pa_copy.convert_effectrecords2array()
+                    if aux_signals:
+                        pa_copy.effects = self._merge_auxiliary_signals(
+                            pa_copy.effects, aux_signals
+                        )
+
                 # Add protocol application as study
                 substance.study = [pa_copy]
                 substances.append(substance)
@@ -673,30 +1291,90 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         
         return mx.Substances(substance=substances)
 
+    def _condition_units(self, conditions_df: pd.DataFrame) -> dict:
+        """{condition name: declared unit or None} straight from the template.
+
+        The template's own `conditions` block is the authority on what a
+        condition is and what unit it carries -- not the data table's header
+        row, which across this corpus is variously blank, a stray number, or
+        a value that leaked out of a mis-shaped header.
+        """
+        units = {}
+        if conditions_df is None or "name" not in conditions_df:
+            return units
+        for _, row in conditions_df.iterrows():
+            unit = row.get("unit", None)
+            units[row["name"]] = None if pd.isna(unit) else unit
+        return units
+
     def _parse_effects_from_dataframe(
         self,
         df: pd.DataFrame,
         endpoints_df: pd.DataFrame,
         conditions_df: pd.DataFrame,
-        endpoint_type: str = "RAW_DATA"
-    ) -> List[mx.EffectArray]:
+        endpoint_type: str = "RAW_DATA",
+        text_conditions: List[str] = None,
+        share_conditions: dict = None,
+    ) -> List[mx.EffectRecord]:
         """
-        Parse effects from a data table (raw or results) into EffectArray objects.
-        
+        Flatten a data table (raw or results) into plain EffectRecords -- one
+        per data row per endpoint, carrying that row's declared conditions.
+
+        Assembling these into nD EffectArrays (and splitting on categorical
+        conditions) is deliberately NOT done here: that is
+        ProtocolApplication.convert_effectrecords2array()'s job, called once
+        by to_protocol_application(). See the comment there.
+
         Args:
             df: DataFrame with multi-level column headers (endpoint, unit)
             endpoints_df: DataFrame with endpoint metadata
             conditions_df: DataFrame with condition metadata
             endpoint_type: Type of endpoint ("RAW_DATA" or "AGGREGATED")
-            
+
         Returns:
-            List of EffectArray objects
+            List of EffectRecord objects
         """
         effects = []
-        
-        # Identify condition columns and endpoint columns
-        condition_names = conditions_df["name"].tolist() if "name" in conditions_df else []
-        
+
+        # Conditions are exactly the ones the template declares as such.
+        condition_units = self._condition_units(conditions_df)
+
+        # `text_conditions` names value_text endpoints to be treated as
+        # conditions of the other endpoints in the same row instead.
+        #
+        # Some templates declare a column that QUALIFIES a row -- which gene
+        # a Cq belongs to, which compartment was sampled -- as a value_text
+        # endpoint rather than as a condition. Kept as an endpoint it is a
+        # text "measurement", and a text signal is not plottable (h5web
+        # rejects a non-numeric signal), while the numeric endpoints it
+        # qualifies are left with nothing to index them by. Naming it here
+        # moves it to the side of the model it belongs on, which also lets
+        # the record->array conversion split on it and yield one numeric
+        # array per value. This is a per-dataset override precisely because
+        # it cannot be inferred from the template -- the template says the
+        # opposite.
+        promoted = set(text_conditions or [])
+
+        # {borrower_name: primary_name} -- a borrower endpoint grid-builds
+        # over the PRIMARY's own declared conditions instead of (typically)
+        # none of its own. Two endpoints built over the same conditions from
+        # the same table naturally come out with identical axes (same
+        # pd.unique() input, same order) -- the same reason two endpoints
+        # that independently declare the same real condition merge cleanly
+        # via aux_signals (e.g. SLS's Number/Volume, both declaring
+        # Wavelength). This is for the case neither declares it: real case,
+        # a template where "Fraction"/"Leachate"/"Temperature" describe the
+        # SAME row's "Concentration bacteria" measurement but declare no
+        # conditions of their own at all, so aux_signals alone has no shared
+        # axes to match them by.
+        # Keyed by stripped borrower name -- looked up below via
+        # endpoint_name.strip(), same whitespace tolerance as the primary
+        # lookup itself (see the comment there).
+        borrows_from = {}
+        for primary_name, borrowers in (share_conditions or {}).items():
+            for borrower_name in borrowers:
+                borrows_from[borrower_name.strip()] = primary_name
+
         # Get endpoint columns from endpoints_df
         endpoint_col = "name" if "name" in endpoints_df else "endpoint"
         if endpoint_col not in endpoints_df:
@@ -705,7 +1383,26 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         endpoint_names = endpoints_df[endpoint_col].tolist()
         
         # For each endpoint, create an EffectArray
+        promoted_cols = {}
+        for name in promoted:
+            col = self.pick_column(df, name)
+            if col is not None:
+                promoted_cols[name] = col
+
+        # Which material each row is actually about. A row-level table
+        # commonly reports on several materials at once (doses of one
+        # material, its vehicle control, a shared calibration curve, ...);
+        # without this, every record in the table would end up attached to
+        # every one of those materials, not just its own -- to_substances()
+        # uses it to route each record to its own substance. Not a
+        # `conditions` entry: this identifies WHICH SAMPLE a record belongs
+        # to, not a value the record was measured across, so it must not
+        # become a grid axis when convert_effectrecords2array() runs.
+        material_col = self.pick_column(df, "Material")
+
         for endpoint_name in endpoint_names:
+            if endpoint_name in promoted:
+                continue  # carried as a condition of the other endpoints
             # Find the column in df
             endpoint_col_tuple = self.pick_column(df, endpoint_name)
             if endpoint_col_tuple is None:
@@ -727,102 +1424,133 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             unit = None
             if isinstance(endpoint_col_tuple, tuple) and len(endpoint_col_tuple) > 1:
                 raw_unit = endpoint_col_tuple[1]
+                # A real unit cell is always text; anything else (a stray
+                # data value that leaked into the header row -- see
+                # get_unit() in df_to_nd_effectarray_multicol for the same
+                # fix) is not a unit either, same verdict as NaN.
                 unit = (
                     None
                     if raw_unit is None
                     or pd.isna(raw_unit)
-                    or str(raw_unit).startswith("Unnamed")
+                    or not isinstance(raw_unit, str)
+                    or raw_unit.startswith("Unnamed")
                     else raw_unit
                 )
             
-            # Get conditions for this endpoint
-            endpoint_conditions = endpoint_meta.get("conditions", [])
+            # Conditions for this endpoint -- exactly the ones the template
+            # declares for it, no more (unless share_conditions says this
+            # endpoint borrows another's -- see borrows_from above).
+            # Stripped before matching: real MOMENTUM endpoint names
+            # routinely carry incidental trailing whitespace ("Concentration
+            # bacteria " vs the "Concentration bacteria" a caller writes in
+            # pipeline.yaml), and a share_conditions entry that silently
+            # fails to match falls back to no borrowed conditions at all --
+            # exactly the same class of mismatch fixed elsewhere for
+            # material identifiers.
+            if endpoint_name.strip() in borrows_from:
+                primary_name = borrows_from[endpoint_name.strip()].strip()
+                primary_meta = endpoints_df[
+                    endpoints_df[endpoint_col].astype(str).str.strip()
+                    == primary_name
+                ]
+                endpoint_conditions = (
+                    primary_meta.iloc[0].get("conditions")
+                    if not primary_meta.empty
+                    else None
+                )
+            else:
+                endpoint_conditions = endpoint_meta.get("conditions", [])
             if endpoint_conditions is None:
                 endpoint_conditions = []
             if isinstance(endpoint_conditions, float) and np.isnan(endpoint_conditions):
                 endpoint_conditions = []
-            axes_dict = {}
+
+            # The template says whether an endpoint is a number or text
+            # ("value_num" / "value_text"); nothing here sniffs the data to
+            # second-guess it -- except this one override: a value_text
+            # endpoint whose recorded values are nearly all numbers anyway
+            # (a real case: "Volume", declared value_text with unit "mL",
+            # actually 0.2/0.022/... throughout) is trusted as numeric, since
+            # the declared unit alone cannot tell a real unit from an enum
+            # list packed into the same field ("Yes/No", "PA/PP/PVC") and the
+            # data itself is decisive where that is ambiguous. Everything
+            # else downstream of the record -- which conditions are
+            # categorical enough to split on, stripping text that merely
+            # wraps a number ("Replicate 1" -> 1) -- stays
+            # convert_effectrecords2array()'s job.
+            is_text_endpoint = endpoint_meta.get(
+                "type", None
+            ) == "value_text" and not self._column_looks_numeric(
+                df[endpoint_col_tuple]
+            )
+
+            cond_cols = {}
             for cond_name in endpoint_conditions:
                 cond_col = self.pick_column(df, cond_name)
                 if cond_col is not None:
-                    # Get unique values for this condition
-                    unique_vals = pd.unique(df[cond_col].dropna())
-                    if len(unique_vals) > 0:
-                        # Get unit for condition
-                        cond_meta = conditions_df[conditions_df["name"] == cond_name]
-                        cond_unit = None
-                        if not cond_meta.empty:
-                            cond_unit = cond_meta.iloc[0].get("unit", None)
-                            cond_unit = None if pd.isna(cond_unit) else cond_unit
+                    cond_cols[cond_name] = cond_col
+            # Promoted columns qualify every endpoint in the row, whether or
+            # not the template listed them among that endpoint's conditions
+            # (it did not -- that is the defect being worked around).
+            for cond_name, cond_col in promoted_cols.items():
+                cond_cols.setdefault(cond_name, cond_col)
 
-                        axes_dict[cond_name] = mx.ValueArray(
-                            values=self._numeric_axis_values(unique_vals),
-                            unit=cond_unit
+            for idx in df.index:
+                value = df.at[idx, endpoint_col_tuple]
+                if pd.isna(value):
+                    continue
+
+                conditions = {}
+                for cond_name, cond_col in cond_cols.items():
+                    raw = df.at[idx, cond_col]
+                    if pd.isna(raw):
+                        # This row has no value for that condition (e.g. a
+                        # vehicle control with no concentration) -- omit it
+                        # rather than inventing one.
+                        continue
+                    cond_unit = condition_units.get(cond_name)
+                    numeric = pd.to_numeric(raw, errors="coerce")
+                    if cond_unit is not None and not pd.isna(numeric):
+                        # A condition the template gave a unit is a measured
+                        # quantity, so carry it as a Value -- that is what
+                        # keeps the declared unit attached to the axis the
+                        # conversion builds from these records.
+                        conditions[cond_name] = mx.Value(
+                            loValue=float(numeric), unit=cond_unit
                         )
-            
-            # Build signal array
-            if len(axes_dict) > 0:
-                # Multi-dimensional data - use df_to_nd_effectarray_multicol
-                try:
-                    effect = self.df_to_nd_effectarray_multicol(
-                        df=df,
-                        axes_dict=axes_dict,
-                        main_signal=endpoint_name,
-                        endpoint=endpoint_name,
-                        endpointtype=endpoint_type
-                    )
-                    effects.append(effect)
-                except Exception as e:
-                    print(f"Warning: Could not create EffectArray for {endpoint_name}: {e}")
-            else:
-                # Simple 1D data
-                values = df[endpoint_col_tuple].dropna()
-                if len(values) > 0:
-                    # The blueprint declares its own type ("value_text" for a
-                    # categorical result like a cell-line/matrix label,
-                    # "value_num" for a measured quantity). A text-valued
-                    # ValueArray has no HDF5 equivalent and breaks to_nexus(),
-                    # but the real reason to route on this is that the
-                    # blueprint author already said which one it is -- one
-                    # EffectRecord per distinct value for text, one EffectArray
-                    # for numeric.
-                    result_type = endpoint_meta.get("type", None)
-                    if result_type == "value_num" and not pd.api.types.is_numeric_dtype(values):
-                        # pandas infers a whole column as object dtype the
-                        # moment ANY cell in it is non-numeric -- one "-" or
-                        # "n.d." "not measured" marker among fifty real
-                        # numbers is enough. That used to misroute every real
-                        # number in the column into text EffectRecords,
-                        # discarding them as measured data (real case: MOMENTUM
-                        # Py-GC-MS polymer-quantity columns with a stray "-"
-                        # for a below-LOQ sample). Trust the blueprint's own
-                        # declared type over pandas' dtype inference: coerce
-                        # to numeric and drop what still doesn't parse (the
-                        # marker cells themselves, same as a real NaN already
-                        # is by the .dropna() above).
-                        coerced = pd.to_numeric(values, errors="coerce")
-                        if coerced.notna().any():
-                            values = coerced.dropna()
-                    is_text = result_type == "value_text" or not pd.api.types.is_numeric_dtype(values)
-                    if is_text:
-                        for v in pd.unique(values):
-                            effects.append(
-                                mx.EffectRecord(
-                                    endpoint=endpoint_name,
-                                    endpointtype=endpoint_type,
-                                    result=mx.EffectResult(textValue=str(v), unit=unit),
-                                    conditions={},
-                                )
-                            )
                     else:
-                        signal = mx.ValueArray(values=np.array(values.values), unit=unit)
-                        effect = mx.EffectArray(
-                            endpoint=endpoint_name,
-                            endpointtype=endpoint_type,
-                            signal=signal,
-                            axes={},
-                            conditions={}
-                        )
-                        effects.append(effect)
-        
+                        conditions[cond_name] = raw
+
+                if is_text_endpoint:
+                    # Same fix as _parse_effects_from_pchem's text branch: a
+                    # value_text endpoint's declared "unit" is routinely the
+                    # field's enum options, not a physical unit (e.g.
+                    # "Fraction" -> "Strainer/Flow-through/Total", "Leachate"
+                    # -> "Yes/No") -- never carry it through as the result's
+                    # unit.
+                    result = mx.EffectResult(textValue=str(value), unit=None)
+                else:
+                    numeric_value = pd.to_numeric(value, errors="coerce")
+                    if pd.isna(numeric_value):
+                        # The template declares this endpoint numeric, so a
+                        # cell that is not a number is a "not measured"
+                        # marker ("-", "n.d."), not a result to record.
+                        continue
+                    result = mx.EffectResult(loValue=float(numeric_value), unit=unit)
+
+                material = (
+                    None
+                    if material_col is None or pd.isna(df.at[idx, material_col])
+                    else str(df.at[idx, material_col]).strip()
+                )
+                effects.append(
+                    mx.EffectRecord(
+                        endpoint=endpoint_name,
+                        endpointtype=endpoint_type,
+                        result=result,
+                        conditions=conditions,
+                        sampleID=material,
+                    )
+                )
+
         return effects

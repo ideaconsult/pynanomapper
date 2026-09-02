@@ -1,5 +1,5 @@
 """Regression tests for TemplateDesignerParser edge cases found while
-converting the MOMENTUM Template Designer corpus.
+converting real Template Designer workbooks.
 
 Each test builds its inputs synthetically (no Excel file, no external
 fixture) and calls `TemplateDesignerParser` methods directly on a bare
@@ -91,16 +91,13 @@ def test_get_parameters_numeric_value_with_unit_still_builds_value():
 
 
 def test_parse_effects_endpoint_with_nan_unit_header():
-    """A 1D numeric endpoint whose MultiIndex second header level is NaN
+    """A numeric endpoint whose MultiIndex second header level is NaN
     (a float, not the usual "Unnamed: N" string) must not crash reading its
     unit.
 
-    Real case: several MOMENTUM cytokine-release workbooks have a bare
-    endpoint column with an empty header cell below it, which pandas reads
-    as float NaN rather than "Unnamed: N" -- `nan.startswith(...)` raised
-    AttributeError. Endpoints with an axis condition are covered by
-    `df_to_nd_effectarray_multicol`'s own (already-correct) `get_unit`; this
-    exercises the simple 1D branch in `_parse_effects_from_dataframe`.
+    Seen where a workbook has a bare endpoint column with an empty header
+    cell below it, which pandas reads as float NaN rather than "Unnamed: N"
+    -- `nan.startswith(...)` raised AttributeError.
     """
     df = pd.DataFrame(
         {("CXCL2 concentration", float("nan")): [1.0, 2.0, 3.0]}
@@ -118,24 +115,22 @@ def test_parse_effects_endpoint_with_nan_unit_header():
         endpoint_type="AGGREGATED",
     )
 
-    assert len(effects) == 1
-    assert effects[0].endpoint == "CXCL2 concentration"
-    assert effects[0].signal.unit is None
-    assert list(effects[0].signal.values) == [1.0, 2.0, 3.0]
+    # One flat EffectRecord per data row -- assembling them into an
+    # EffectArray is convert_effectrecords2array()'s job, not this method's.
+    assert len(effects) == 3
+    assert {e.endpoint for e in effects} == {"CXCL2 concentration"}
+    assert all(e.result.unit is None for e in effects)
+    assert [e.result.loValue for e in effects] == [1.0, 2.0, 3.0]
 
 
-def test_df_to_nd_effectarray_multicol_skips_row_missing_axis_value():
-    """A row with no value on one of the endpoint's own axes must be
-    skipped, not crash the whole EffectArray.
+def test_row_missing_a_condition_value_omits_only_that_condition():
+    """A row with no value for one of its declared conditions still yields a
+    record -- just without that condition.
 
-    Real case: MOMENTUM ROS-production dose-response tables include vehicle
-    / H2O2 control rows that legitimately have no `concentration` (there is
-    no dose for a control). `pd.unique()` keeps NaN as a distinct axis
-    value, but dict lookup on NaN is not reliably reflexive (nan != nan), so
-    `idx_map[ax][row[axis_cols[ax]]]` raised `KeyError` on those rows and the
-    surrounding try/except in `_parse_effects_from_dataframe` then dropped
-    the ENTIRE endpoint -- silently turning a real dose-response signal into
-    zero effects, for every workbook containing even one control row.
+    Seen in dose-response tables that include vehicle / positive-control
+    rows which legitimately have no `concentration` (a control has no dose).
+    Those rows must not be dropped, and must not invent a concentration
+    either; the conversion then groups them on the conditions they do have.
     """
     df = pd.DataFrame(
         {
@@ -166,20 +161,21 @@ def test_df_to_nd_effectarray_multicol_skips_row_missing_axis_value():
         endpoint_type="AGGREGATED",
     )
 
-    assert len(effects) == 1
-    signal = effects[0].signal
-    values = np.asarray(signal.values, dtype=float)
-    # The two NaN-concentration control rows are skipped (no cell for them);
-    # the two dosed rows survive and land at their own concentration index.
-    assert np.count_nonzero(~np.isnan(values)) == 2
+    assert len(effects) == 4
+    assert [e.result.loValue for e in effects] == [2.48, 1.0, 0.69, 1.20]
+    # The two control rows carry no concentration at all ...
+    assert effects[0].conditions == {}
+    assert effects[1].conditions == {}
+    # ... while the dosed rows carry it as a Value with its declared unit.
+    assert effects[2].conditions["concentration"].loValue == 1.0
+    assert effects[2].conditions["concentration"].unit == "ug/ml"
 
 
 def test_df_to_nd_effectarray_multicol_falls_back_to_blueprint_unit():
     """An axis whose data-table column carries no unit in its own header
     must still get the unit the blueprint declares for that condition.
 
-    Real case: several MOMENTUM workbooks (uptake/RUG_PAM_phagocytosis,
-    ROS-production/RUG_PAM-ROS) declare e.g. "Concentration: ug/mL" in the
+    Seen where a workbook declares e.g. "Concentration: ug/mL" in the
     blueprint's `conditions`, but the actual Results_TABLE column's own unit
     cell is blank. `_parse_effects_from_dataframe` already resolves the
     correct unit from `conditions_df` and passes it into `axes_dict` --
@@ -217,17 +213,13 @@ def test_df_to_nd_effectarray_multicol_falls_back_to_blueprint_unit():
 def test_parse_effects_value_num_column_with_one_marker_cell():
     """A `value_num` endpoint whose column has one non-numeric "not
     measured" marker cell (pandas then infers object dtype for the WHOLE
-    column) must still parse as a numeric EffectArray, not be misrouted
-    into text EffectRecords for every real number it holds.
+    column) must still yield numeric records for every real number it
+    holds, with only the marker cell dropped.
 
-    Real case: MOMENTUM Py-GC-MS workbooks (e.g. Bronchial wash_RUG.xlsx)
-    declare polymer-quantity columns like "PET"/"PMMA" as `value_num` (unit
-    "ng"), but one sample among 47 has a literal "-" instead of a value.
-    `pd.api.types.is_numeric_dtype()` on that column returns False for the
-    WHOLE column because of that one cell, and the old code trusted dtype
-    inference over the blueprint's own declared type -- turning 46 real
-    concentration numbers into a pile of stringified text EffectRecords
-    instead of one numeric EffectArray.
+    Seen where a workbook declares quantity columns as `value_num` (unit
+    "ng"), but one sample among many has a literal "-" instead of a value.
+    Trusting pandas' dtype inference over the template's declared type turned
+    46 real concentrations into stringified text.
     """
     df = pd.DataFrame({("PET", "ng"): [11.5, 15.6, "-", 21.8, 0]})
     endpoints_df = pd.DataFrame(
@@ -243,9 +235,477 @@ def test_parse_effects_value_num_column_with_one_marker_cell():
         endpoint_type="AGGREGATED",
     )
 
-    assert len(effects) == 1
-    effect = effects[0]
-    assert hasattr(effect, "signal"), "must be an EffectArray, not EffectRecords"
-    values = np.asarray(effect.signal.values, dtype=float)
-    assert sorted(values.tolist()) == [0.0, 11.5, 15.6, 21.8]
-    assert effect.signal.unit == "ng"
+    # The "-" marker is dropped; every real number survives as a numeric
+    # record carrying the template's declared unit.
+    assert len(effects) == 4
+    assert sorted(e.result.loValue for e in effects) == [0.0, 11.5, 15.6, 21.8]
+    assert all(e.result.unit == "ng" for e in effects)
+    assert all(e.result.textValue is None for e in effects)
+
+
+def test_to_substances_routes_each_record_to_its_own_material():
+    """Each substance must get only the records about IT, not the whole
+    file's data.
+
+    Real case: a dose-response table commonly reports several materials at
+    once (a dose series, its vehicle control, a shared calibration curve),
+    all in one Raw_data_TABLE/Results_TABLE. to_substances() used to clone
+    the SAME effects list onto every selected material -- every substance's
+    study ended up holding every OTHER substance's measurements too.
+    """
+    import pyambit.datamodel as mx
+
+    effects = [
+        mx.EffectRecord(
+            endpoint="Viability",
+            result=mx.EffectResult(loValue=v, unit="%"),
+            conditions={},
+            sampleID=material,
+        )
+        for material, v in [("CuO", 80.0), ("CuO", 82.0), ("TiO2", 90.0)]
+    ]
+    pa = mx.ProtocolApplication(
+        protocol=mx.Protocol(
+            topcategory="TOX",
+            category=mx.EndpointCategory(code="NPO_1339_SECTION"),
+            endpoint="assay",
+            guideline=["sop"],
+        ),
+        effects=effects,
+    )
+
+    parser = _bare_parser(
+        materials=pd.DataFrame(
+            {"ERM identifier": ["CuO", "TiO2 "], "type": ["metal_oxide", "metal_oxide"]}
+        ),
+        test_conditions=pd.DataFrame(
+            {"A": ["Select item from Project Materials list"], "B": ["CuO"], "C": ["TiO2"]}
+        ),
+        template_json={"provenance_provider": "TestOwner"},
+    )
+    parser.get_project_name = lambda: "TestProject"
+
+    substances = parser.to_substances(pa=pa).substance
+
+    def signal_values(substance):
+        effect = substance.study[0].effects[0]
+        return set(np.asarray(effect.signal.values, dtype=float).tolist())
+
+    # `name` is the material ID (see to_substances: i5uuid/name/publicname
+    # are all set from the same stripped material_id).
+    by_material = {s.name: s for s in substances}
+    # No conditions on either endpoint, so each substance's own records
+    # assemble into one EffectArray (convert_effectrecords2array) -- the
+    # values that matter here are which ones ended up in it, not how many
+    # EffectRecord/EffectArray objects that took.
+    assert len(by_material["CuO"].study[0].effects) == 1
+    assert len(by_material["TiO2"].study[0].effects) == 1
+    assert signal_values(by_material["CuO"]) == {80.0, 82.0}
+    assert signal_values(by_material["TiO2"]) == {90.0}
+
+
+def test_to_substances_keeps_every_record_with_no_material_column():
+    """A record with no sampleID at all (the table has no Material column)
+    must stay available to every selected substance -- e.g. Py-GC-MS
+    polymer-standard quantities that legitimately apply to every run, not
+    to one material each.
+    """
+    import pyambit.datamodel as mx
+
+    effects = [
+        mx.EffectRecord(
+            endpoint="PET",
+            result=mx.EffectResult(loValue=11.5, unit="ng"),
+            conditions={},
+        )
+    ]
+    pa = mx.ProtocolApplication(
+        protocol=mx.Protocol(
+            topcategory="TOX",
+            category=mx.EndpointCategory(code="NPO_1339_SECTION"),
+            endpoint="assay",
+            guideline=["sop"],
+        ),
+        effects=effects,
+    )
+    parser = _bare_parser(
+        materials=pd.DataFrame({"ERM identifier": ["PET_std"], "type": ["polymer"]}),
+        test_conditions=pd.DataFrame(
+            {"A": ["Select item from Project Materials list"], "B": ["PET_std"]}
+        ),
+        template_json={},
+    )
+    parser.get_project_name = lambda: "TestProject"
+
+    substances = parser.to_substances(pa=pa).substance
+
+    assert len(substances) == 1
+    assert len(substances[0].study[0].effects) == 1
+
+
+def test_pchem_layout_end_to_end():
+    """The "pchem" layout (FTIR/SLS/XRF): Provider_informations instead of
+    Test_conditions, one Results_TABLE (4-level header: top-label / name /
+    aggregate-type / unit) holding both raw and processed data instead of a
+    Raw_data_TABLE/Results_TABLE split, and no selector cell for materials
+    used -- SAMPLES/Results_TABLE are already keyed by Material ID.
+
+    Before pchem support, __init__ unconditionally read Test_conditions,
+    failing every such workbook with
+    "Worksheet named 'Test_conditions' not found" -- these templates were
+    entirely unparseable.
+    """
+    results = pd.DataFrame(
+        {
+            ("Material ID", "u0", "u0", "u0"): ["ERM1", "ERM1", "ERM2", "ERM2"],
+            ("Position_ID", "u1", "u1", "u1"): [1, 1, 2, 2],
+            ("Raw data", "Wavenumber (cm-1)", "RAW_DATA", "cm-1"): [
+                670.0, 680.0, 670.0, 680.0,
+            ],
+            ("Raw data", "Transmission", "RAW_DATA", "%"): [85.9, 83.4, 90.1, 88.2],
+        }
+    )
+    provider_info = pd.DataFrame(
+        {
+            0: [None, "General information", None, None, None, "Project", "Workpackage", "Partner"],
+            1: [None, None, None, None, None, "MOMENTUM", "WP1", "TNO"],
+            2: [None, "FTIR spectroscopy", None, None, None, None, None, None],
+            3: [None, None, None, None, None, None, "Study", None],
+            4: [None, None, None, None, None, None, "FTIR", None],
+        }
+    )
+    measuring_conditions = pd.DataFrame(
+        {
+            ("Position_ID", "u0", "u0"): [1, 2],
+            ("METADATA_PARAMETERS", "INSTRUMENT", "Instrument"): ["Nicolet iN10", "Nicolet iN10"],
+        }
+    )
+    samples = pd.DataFrame(
+        {
+            ("Material ID", "u0"): ["ERM1", "ERM2"],
+            ("Sample preparation", "DISPERSION"): ["1-propanol", "1-propanol"],
+        }
+    )
+
+    parser = _bare_parser(
+        template_json={
+            "template_layout": "pchem",
+            "PROTOCOL_TOP_CATEGORY": "P-CHEM",
+            "PROTOCOL_CATEGORY_CODE": "ANALYTICAL_METHODS_SECTION",
+            "METHOD": "FTIR",
+            "EXPERIMENT": "FTIR spectroscopy",
+            "raw_data_report": [
+                {
+                    "raw_endpoint": "Wavenumber (cm-1)",
+                    "raw_aggregate": "RAW_DATA",
+                    "raw_unit": "cm-1",
+                    "raw_type": "value_num",
+                },
+                {
+                    "raw_endpoint": "Transmission",
+                    "raw_aggregate": "RAW_DATA",
+                    "raw_unit": "%",
+                    "raw_type": "value_num",
+                },
+            ],
+            "question3": [],
+            "conditions": [],
+        },
+        provider_info=provider_info,
+        results=results,
+        measuring_conditions=measuring_conditions,
+        samples=samples,
+        materials=pd.DataFrame(
+            {"ERM identifier": ["ERM1", "ERM2"], "type": ["metal_oxide", "metal_oxide"]}
+        ),
+        test_conditions=None,
+        raw=None,
+        calibration=None,
+    )
+
+    assert parser.get_project_name() == "MOMENTUM"
+    assert parser.get_work_package() == "WP1"
+    assert parser.get_partner() == "TNO"
+
+    pa = parser.to_protocol_application(convert_to_arrays=False)
+    assert len(pa.effects) == 8  # 4 rows x 2 endpoints
+    assert pa.citation.owner == "TNO"
+    assert pa.citation.title == "WP1"
+
+    substances = parser.to_substances(pa=pa).substance
+    by_material = {s.name: s for s in substances}
+    assert set(by_material) == {"ERM1", "ERM2"}
+    erm1_wavenumber = next(
+        e for e in by_material["ERM1"].study[0].effects
+        if e.endpoint == "Wavenumber (cm-1)"
+    )
+    assert sorted(np.asarray(erm1_wavenumber.signal.values, dtype=float).tolist()) == [
+        670.0, 680.0,
+    ]
+    assert erm1_wavenumber.signal.unit == "cm-1"
+
+
+def test_pchem_text_conditions_promotes_axis_endpoint():
+    """A pchem endpoint promoted via `text_conditions` becomes an axis of
+    the other endpoints in its row, instead of its own independent scalar
+    series.
+
+    Real case: FTIR/SLS declare their x-axis ("Wavenumber (cm-1)",
+    "Wavelength") as a plain RAW_DATA endpoint, with no raw_conditions on
+    the real signal (Transmission, Number, Volume) pointing at it -- every
+    spectrum wrote as several unlinked scalar series instead of one signal
+    plotted against its axis.
+    """
+    results = pd.DataFrame(
+        {
+            ("Material ID", "u0", "u0", "u0"): ["ERM1", "ERM1", "ERM1"],
+            ("Position_ID", "u1", "u1", "u1"): [1, 1, 1],
+            ("Raw data", "Wavenumber (cm-1)", "RAW_DATA", "cm-1"): [
+                670.0, 680.0, 690.0,
+            ],
+            ("Raw data", "Transmission", "RAW_DATA", "%"): [85.9, 83.4, 82.2],
+        }
+    )
+    parser = _bare_parser(
+        template_json={
+            "template_layout": "pchem",
+            "PROTOCOL_TOP_CATEGORY": "P-CHEM",
+            "PROTOCOL_CATEGORY_CODE": "ANALYTICAL_METHODS_SECTION",
+            "METHOD": "FTIR",
+            "EXPERIMENT": "FTIR spectroscopy",
+            "raw_data_report": [
+                {
+                    "raw_endpoint": "Wavenumber (cm-1)",
+                    "raw_aggregate": "RAW_DATA",
+                    "raw_unit": "cm-1",
+                    "raw_type": "value_num",
+                },
+                {
+                    "raw_endpoint": "Transmission",
+                    "raw_aggregate": "RAW_DATA",
+                    "raw_unit": "%",
+                    "raw_type": "value_num",
+                },
+            ],
+            "question3": [],
+            "conditions": [],
+        },
+        provider_info=pd.DataFrame(),
+        results=results,
+        measuring_conditions=pd.DataFrame(),
+        samples=pd.DataFrame(
+            {
+                ("Material ID", "u0"): ["ERM1"],
+                ("Sample preparation", "DISPERSION"): ["1-propanol"],
+            }
+        ),
+        materials=pd.DataFrame({"ERM identifier": ["ERM1"], "type": ["polymer"]}),
+        test_conditions=None,
+        raw=None,
+        calibration=None,
+    )
+
+    pa = parser.to_protocol_application(text_conditions=["Wavenumber (cm-1)"])
+
+    assert len(pa.effects) == 1
+    effect = pa.effects[0]
+    assert effect.endpoint == "Transmission"
+    assert sorted(np.asarray(effect.signal.values, dtype=float).tolist()) == [
+        82.2, 83.4, 85.9,
+    ]
+    axis = effect.axes["Wavenumber (cm-1)"]
+    assert axis.unit == "cm-1"
+    assert sorted(np.asarray(axis.values, dtype=float).tolist()) == [670.0, 680.0, 690.0]
+
+
+def test_aux_signals_merges_two_arrays_sharing_axes():
+    """A primary/aux pair with the same conditions and axes folds into one
+    EffectArray (signal + auxiliary), not two independent NXdata entries.
+
+    Real case: SLS reports "Number" and "Volume" as two independent
+    endpoints, both a distribution over the same "Wavelength" bins -- two
+    views of the same measurement, not two unrelated signals.
+    """
+    results = pd.DataFrame(
+        {
+            ("Material ID", "u0", "u0", "u0"): ["ERM1"] * 3,
+            ("Position_ID", "u1", "u1", "u1"): [1, 1, 1],
+            ("Raw data", "Wavelength", "RAW_DATA", "um"): [0.01, 0.02, 0.03],
+            ("Raw data", "Number", "RAW_DATA", "%"): [1.0, 2.0, 3.0],
+            ("Raw data", "Volume", "RAW_DATA", "%"): [10.0, 20.0, 30.0],
+        }
+    )
+    parser = _bare_parser(
+        template_json={
+            "template_layout": "pchem",
+            "PROTOCOL_TOP_CATEGORY": "P-CHEM",
+            "PROTOCOL_CATEGORY_CODE": "PC_GRANULOMETRY_SECTION",
+            "METHOD": "SLS",
+            "EXPERIMENT": "SLS",
+            "raw_data_report": [
+                {"raw_endpoint": "Wavelength", "raw_aggregate": "RAW_DATA", "raw_unit": "um", "raw_type": "value_num"},
+                {"raw_endpoint": "Number", "raw_aggregate": "RAW_DATA", "raw_unit": "%", "raw_type": "value_num"},
+                {"raw_endpoint": "Volume", "raw_aggregate": "RAW_DATA", "raw_unit": "%", "raw_type": "value_num"},
+            ],
+            "question3": [],
+            "conditions": [],
+        },
+        provider_info=pd.DataFrame(),
+        results=results,
+        measuring_conditions=pd.DataFrame(),
+        samples=pd.DataFrame(
+            {("Material ID", "u0"): ["ERM1"], ("Sample preparation", "u1"): ["dispersed"]}
+        ),
+        materials=pd.DataFrame({"ERM identifier": ["ERM1"], "type": ["polymer"]}),
+        test_conditions=None,
+        raw=None,
+        calibration=None,
+    )
+    parser.get_project_name = lambda: "TestProject"
+
+    pa = parser.to_protocol_application(
+        convert_to_arrays=False, text_conditions=["Wavelength"]
+    )
+    substances = parser.to_substances(
+        pa=pa, aux_signals={"Number": ["Volume"]}
+    ).substance
+
+    effects = substances[0].study[0].effects
+    assert [e.endpoint for e in effects] == ["Number"]
+    number = effects[0]
+    assert sorted(np.asarray(number.signal.values, dtype=float).tolist()) == [
+        1.0, 2.0, 3.0,
+    ]
+    volume = number.signal.auxiliary["Volume"]
+    assert sorted(np.asarray(volume.values, dtype=float).tolist()) == [10.0, 20.0, 30.0]
+    assert volume.unit == "%"
+
+
+def test_share_conditions_lets_unconditioned_endpoint_merge_as_aux():
+    """An endpoint with no declared conditions of its own borrows a
+    primary's conditions (share_conditions) so it grid-builds over the same
+    axes, then merges into the primary as an auxiliary signal (aux_signals)
+    -- the two features composed, matching wp5's real case: "Fraction"/
+    "Leachate"/... are outcomes of the same "Concentration bacteria" row,
+    not conditions of it, but declare no conditions of their own at all, so
+    aux_signals alone (structural conditions+axes matching) has nothing to
+    match them by.
+
+    Also exercises whitespace tolerance: real endpoint names carry trailing
+    spaces ("Concentration bacteria "); the config here deliberately omits
+    them, matching how a human would write pipeline.yaml.
+    """
+    import pyambit.datamodel as mx
+
+    df = pd.DataFrame(
+        {
+            ("Material", "u0"): ["A", "A", "A", "A"],
+            ("Concentration", "CFU/mL (start)"): [100, 100, 200, 200],
+            ("Replicate", "u1"): [1, 2, 1, 2],
+            ("Concentration bacteria ", "CFU/mL"): [10.0, 12.0, 30.0, 28.0],
+            ("Fraction ", "Strainer/Flow-through/Total"): [
+                "Total", "Total", "Strainer", "Strainer",
+            ],
+        }
+    )
+    endpoints_df = pd.DataFrame(
+        [
+            {
+                "name": "Concentration bacteria ",
+                "unit": "CFU/mL",
+                "conditions": ["Concentration", "Replicate"],
+                "type": "value_num",
+            },
+            {
+                "name": "Fraction ",
+                "unit": "Strainer/Flow-through/Total",
+                "conditions": None,
+                "type": "value_text",
+            },
+        ]
+    )
+    conditions_df = pd.DataFrame(
+        [
+            {"name": "Concentration", "unit": "CFU/mL (start)"},
+            {"name": "Replicate", "unit": None},
+        ]
+    )
+    parser = _bare_parser(template_json={})
+
+    effects = parser._parse_effects_from_dataframe(
+        df=df,
+        endpoints_df=endpoints_df,
+        conditions_df=conditions_df,
+        endpoint_type="AGGREGATED",
+        share_conditions={"Concentration bacteria": ["Fraction"]},
+    )
+    arrays, _ = mx.ProtocolApplication(
+        protocol=mx.Protocol(
+            topcategory="TOX",
+            category=mx.EndpointCategory(code="NPO_1339_SECTION"),
+            endpoint="assay",
+            guideline=["sop"],
+        ),
+        effects=effects,
+    ).convert_effectrecords2array()
+
+    merged = parser._merge_auxiliary_signals(
+        arrays, {"Concentration bacteria": ["Fraction"]}
+    )
+
+    assert [e.endpoint for e in merged] == ["Concentration bacteria "]
+    primary = merged[0]
+    signal_values = np.asarray(primary.signal.values, dtype=float)
+    assert sorted(signal_values.ravel().tolist()) == [10.0, 12.0, 28.0, 30.0]
+
+    fraction = primary.signal.auxiliary["Fraction"]
+    fraction_values = np.asarray(fraction.values)
+    assert set(fraction_values.ravel().tolist()) == {"Total", "Strainer"}
+    # "Strainer/Flow-through/Total" is this endpoint's declared enum
+    # options, not a physical unit (the blueprint packs both in the same
+    # "unit" cell) -- a value_text result must never carry it through as
+    # EffectResult.unit, so it must not survive here either.
+    assert fraction.unit is None
+    # Same shape as the primary signal -- merged in as a true auxiliary
+    # signal (one NXdata), not a mismatched/broadcast side array.
+    assert fraction_values.shape == signal_values.shape
+
+
+def test_value_text_endpoint_never_carries_its_unit_cell_as_a_unit():
+    """A value_text endpoint's declared "unit" is routinely the field's
+    enum options packed into the same blueprint cell, not a physical unit
+    -- e.g. "Fraction" declares unit "Strainer/Flow-through/Total",
+    "Leachate" declares unit "Yes/No". Attaching that to EffectResult.unit
+    made it surface as the written NeXus axis's `units` attribute
+    ("Fraction (Strainer/Flow-through/Total)"), which is simply wrong: it
+    is not a unit "Total" is measured in.
+    """
+    df = pd.DataFrame(
+        {
+            ("Material", "u0"): ["A", "A"],
+            ("Fraction", "Strainer/Flow-through/Total"): ["Total", "Strainer"],
+        }
+    )
+    endpoints_df = pd.DataFrame(
+        [
+            {
+                "name": "Fraction",
+                "unit": "Strainer/Flow-through/Total",
+                "conditions": None,
+                "type": "value_text",
+            }
+        ]
+    )
+    conditions_df = pd.DataFrame(columns=["name"])
+    parser = _bare_parser(template_json={})
+
+    effects = parser._parse_effects_from_dataframe(
+        df=df,
+        endpoints_df=endpoints_df,
+        conditions_df=conditions_df,
+        endpoint_type="AGGREGATED",
+    )
+
+    assert len(effects) == 2
+    assert {e.result.textValue for e in effects} == {"Total", "Strainer"}
+    assert all(e.result.unit is None for e in effects)
