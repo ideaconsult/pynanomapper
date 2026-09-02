@@ -368,14 +368,19 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 if value.empty:
                     continue
                 value = value.iloc[0,0]
+                # No declared group: a bare name, NOT "None/<name>" (str
+                # interpolating a real Python None) -- nexus_writer's
+                # param_lookup() already has a heuristic for placing a
+                # single-segment key, which is the correct fallback here.
                 nx_group = _map_param_group(p_group)
+                param_key = f"{nx_group}/{p_name}" if nx_group else p_name
                 if p_unit is None:
                     if isinstance(value, numbers.Number):
-                        params[f"{nx_group}/{p_name}"] = mx.Value(loValue=value)
+                        params[param_key] = mx.Value(loValue=value)
                     elif pd.isna(value):
                         pass
                     else:
-                        params[f"{nx_group}/{p_name}"] = value  # already string
+                        params[param_key] = value  # already string
                 else:
                     _val, _unit = self.parse_value_unit(value, p_unit)
                     # parse_value_unit falls back to returning the original
@@ -386,11 +391,11 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     # parameter instead, the same as the p_unit is None
                     # branch above already does.
                     if isinstance(_val, numbers.Number):
-                        params[f"{nx_group}/{p_name}"] = mx.Value(
+                        params[param_key] = mx.Value(
                             loValue=_val, unit=_unit
                         )
                     elif not pd.isna(_val):
-                        params[f"{nx_group}/{p_name}"] = _val
+                        params[param_key] = _val
         return params
 
     # --- Detect actual columns in MultiIndex safely ---
@@ -939,8 +944,16 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             value = row[col]
             if pd.isna(value):
                 continue
-            nx_group = str(_map_param_group(group)).lower()
-            params[f"{nx_group}/{str(name).lower()}"] = value
+            # No declared group (a NaN column level): a bare name, not
+            # "nan/<name>" -- same fix as get_parameters()'s dose_response
+            # branch, for the same reason.
+            mapped_group = _map_param_group(group)
+            param_key = (
+                f"{str(mapped_group).lower()}/{str(name).lower()}"
+                if mapped_group is not None and not pd.isna(mapped_group)
+                else str(name).lower()
+            )
+            params[param_key] = value
         return params
 
     def _parse_effects_from_pchem(
@@ -1251,9 +1264,47 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         _materials_used = [
             str(m).strip() for m in self.get_materials_used().iloc[0].to_numpy()
         ]
+        # The selector cell ("Select item from Project Materials list")
+        # only lists the materials under TEST -- it has no reason to also
+        # list assay controls (vehicle, vehicle+prop, non exposed, a
+        # cytokine-stimulant positive control, calibration standards, ...),
+        # yet those routinely appear as real Material values in the row
+        # data. Restricting to the selector alone silently dropped every
+        # one of their EffectRecords (has_material_column routing below
+        # keeps a record only for a material that got a SubstanceRecord)
+        # -- real, correctly-recorded measurements, not noise. Every
+        # distinct sampleID actually present in the data gets its own
+        # substance, whether or not the selector or even the Materials
+        # sheet itself mentions it -- the sheet is a hand-maintained master
+        # list and can legitimately be missing an entry the data table
+        # still names correctly.
+        _materials_in_data = {
+            str(getattr(effect, "sampleID", None)).strip()
+            for effect in pa.effects
+            if getattr(effect, "sampleID", None) is not None
+        }
+        _materials_used = list(dict.fromkeys(_materials_used).keys() | _materials_in_data)
         filtered_materials = self.materials[
             self.materials["ERM identifier"].astype(str).str.strip().isin(_materials_used)
         ]
+        # sampleIDs with real data but no Materials-sheet row at all --
+        # give each a minimal synthetic row (same "ERM identifier" shape
+        # the loop below already reads) instead of dropping their records.
+        _known_ids = set(
+            filtered_materials["ERM identifier"].astype(str).str.strip()
+        )
+        _unmatched_ids = [m for m in _materials_in_data if m not in _known_ids]
+        if _unmatched_ids:
+            # A material with real data but no Materials sheet row at all
+            # is a data-entry defect on the provider's side (the sheet is a
+            # hand-maintained master list) -- fail loudly rather than
+            # silently inventing a substance, same failure mode as "no
+            # material matched the selector" below.
+            raise Exception(
+                "Material(s) with real data have no matching row in the "
+                f"Materials sheet: {_unmatched_ids!r}. Add a row for each "
+                "to the Materials sheet before converting this workbook."
+            )
 
         # The project owns the substances; the partner that ran the assay is
         # who the study is cited to AND who nexus_writer records as the

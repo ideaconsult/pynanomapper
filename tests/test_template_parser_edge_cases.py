@@ -816,3 +816,74 @@ def test_get_parameters_uses_mapped_nexus_group_not_blueprint_group():
 
     assert "environment/Exposure method" in params
     assert "CULTURE CONDITIONS/Exposure method" not in params
+
+
+def test_get_parameters_with_no_group_uses_bare_key():
+    """A METADATA_PARAMETERS entry with no declared param_group must not
+    write "None/<name>" -- str-interpolating a real Python None into the
+    key. Falls back to a bare name (param_lookup's heuristic placement),
+    same as any other group-less parameter.
+    """
+    test_conditions = pd.DataFrame(
+        {"A": ["Serum concentration"], "B": [10.0]}
+    )
+    parser = _bare_parser(
+        template_json={
+            "METADATA_PARAMETERS": [
+                {
+                    "param_name": "Serum concentration",
+                    "param_group": None,
+                    "param_unit": None,
+                }
+            ],
+            "METADATA_SAMPLE_PREP": [],
+        },
+        test_conditions=test_conditions,
+    )
+
+    params = parser.get_parameters()
+
+    assert "Serum concentration" in params
+    assert not any(k.startswith("None/") for k in params)
+
+
+def test_to_substances_raises_when_data_material_has_no_materials_row():
+    """A Material value with real data (a control like "non exposed" or
+    "blank", commonly not catalogued in the Materials sheet the way a real
+    test substance is) but no matching Materials-sheet row must fail
+    loudly, not silently drop its records or invent a substance for it --
+    same failure mode as "no material matched the selector" below it.
+    """
+    import pyambit.datamodel as mx
+
+    effects = [
+        mx.EffectRecord(
+            endpoint="Viability",
+            result=mx.EffectResult(loValue=80.0, unit="%"),
+            conditions={},
+            sampleID="CuO",
+        ),
+        mx.EffectRecord(
+            endpoint="Viability",
+            result=mx.EffectResult(loValue=99.0, unit="%"),
+            conditions={},
+            sampleID="non exposed",
+        ),
+    ]
+    pa = mx.ProtocolApplication(
+        protocol=mx.Protocol(
+            topcategory="TOX",
+            category=mx.EndpointCategory(code="NPO_1339_SECTION"),
+            endpoint="assay",
+            guideline=["sop"],
+        ),
+        effects=effects,
+    )
+    parser = _bare_parser(
+        template_json={},
+        materials=pd.DataFrame({"ERM identifier": ["CuO"], "ID": ["CuO"]}),
+        test_conditions=pd.DataFrame({"A": ["Select item from Project Materials list"], "B": ["CuO"]}),
+    )
+
+    with pytest.raises(Exception, match="non exposed"):
+        parser.to_substances(pa=pa, convert_to_arrays=False)
