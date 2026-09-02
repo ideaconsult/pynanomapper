@@ -709,3 +709,110 @@ def test_value_text_endpoint_never_carries_its_unit_cell_as_a_unit():
     assert len(effects) == 2
     assert {e.result.textValue for e in effects} == {"Total", "Strainer"}
     assert all(e.result.unit is None for e in effects)
+
+
+def test_generate_uuid_matches_java_nameUUIDFromBytes():
+    """generate_uuid(prefix, s) must match
+    net.enanomapper.parser.ExcelParserConfigurator.generateUUID(prefix, s)
+    in nmdataparser/enmexcelparser EXACTLY -- a name-based uuid from the
+    bare MD5 of `s`'s UTF-8 bytes (Java's UUID.nameUUIDFromBytes), NOT
+    Python's uuid.uuid3 (which additionally hashes a namespace UUID's bytes
+    in front of the name, producing a different result for the same input).
+    Expected values pinned by evaluating the Java implementation directly.
+    """
+    from pynanomapper.datamodel.templates.template_parser import generate_uuid
+
+    assert generate_uuid("XLSX", "my-ref-subst") == (
+        "XLSX-2783d803-a237-3d01-88ad-048245654a31"
+    )
+
+
+def test_to_protocol_application_uuids_are_deterministic():
+    """assay_uuid/investigation_uuid must be the SAME across repeated calls
+    on the same workbook -- re-running the pipeline must replace a
+    previous NeXus entry, not orphan it under a fresh random uuid4() every
+    time (the bug this replaces: assay_uuid/investigation_uuid were plain
+    uuid.uuid4() with no relationship to the workbook's own content at
+    all).
+    """
+    parser = _bare_parser(
+        template_json={
+            "PROTOCOL_TOP_CATEGORY": "TOX",
+            "PROTOCOL_CATEGORY_CODE": "NPO_1339_SECTION",
+            "METHOD": "ELISA",
+            "EXPERIMENT": "IL8 ELISA ALI exposures",
+        },
+        test_conditions=pd.DataFrame(
+            {
+                "A": ["Project name", "Work package", "Partner conducting test/assay"],
+                "B": ["MOMENTUM", "WP4", "UM"],
+            }
+        ),
+        materials=pd.DataFrame(columns=["ID"]),
+        raw=None,
+        results=None,
+        calibration=None,
+    )
+
+    pa1 = parser.to_protocol_application(
+        convert_to_arrays=False, uuid_prefix="MOMENTUM"
+    )
+    pa2 = parser.to_protocol_application(
+        convert_to_arrays=False, uuid_prefix="MOMENTUM"
+    )
+
+    assert pa1.assay_uuid == pa2.assay_uuid
+    assert pa1.investigation_uuid == pa2.investigation_uuid
+    assert pa1.assay_uuid.startswith("MOMENTUM-")
+    assert pa1.investigation_uuid.startswith("MOMENTUM-")
+
+
+def test_param_group_maps_to_real_nexus_group():
+    """A blueprint's predefined param_group values (CULTURE CONDITIONS,
+    CELL LINE DETAILS, MEDIUM, ...) must map onto the real NeXus group they
+    belong to (environment/instrument/parameters/calibration), not be
+    written verbatim as their own literal top-level NeXus group.
+    """
+    from pynanomapper.datamodel.templates.template_parser import _map_param_group
+
+    assert _map_param_group("CULTURE CONDITIONS") == "environment"
+    assert _map_param_group("CELL LINE DETAILS") == "environment"
+    assert _map_param_group("MEDIUM") == "environment"
+    assert _map_param_group("INSTRUMENT") == "instrument"
+    assert _map_param_group("MEASUREMENT CONDITIONS") == "instrument"
+    assert _map_param_group("CALIBRATION") == "calibration"
+    assert _map_param_group("OTHER_METADATA") == "parameters"
+    assert _map_param_group("RESULT_ANALYSIS") == "parameters"
+    # Case-insensitive (pchem's _get_pchem_parameters lowercases its group
+    # before this call).
+    assert _map_param_group("culture conditions") == "environment"
+    # Unrecognized group: passed through unchanged rather than dropped.
+    assert _map_param_group("SOME_NEW_GROUP") == "SOME_NEW_GROUP"
+
+
+def test_get_parameters_uses_mapped_nexus_group_not_blueprint_group():
+    """get_parameters()'s keys must carry the MAPPED NeXus group name, not
+    the blueprint's own param_group string -- CULTURE CONDITIONS/Exposure
+    method, not culture_conditions/... or CULTURE CONDITIONS/... verbatim.
+    """
+    test_conditions = pd.DataFrame(
+        {"A": ["Exposure method"], "B": ["nebulization in cloud"]}
+    )
+    parser = _bare_parser(
+        template_json={
+            "METADATA_PARAMETERS": [
+                {
+                    "param_name": "Exposure method",
+                    "param_group": "CULTURE CONDITIONS",
+                    "param_unit": None,
+                }
+            ],
+            "METADATA_SAMPLE_PREP": [],
+        },
+        test_conditions=test_conditions,
+    )
+
+    params = parser.get_parameters()
+
+    assert "environment/Exposure method" in params
+    assert "CULTURE CONDITIONS/Exposure method" not in params

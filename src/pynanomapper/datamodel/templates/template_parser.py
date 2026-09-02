@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 import pyambit.datamodel as mx
 import pandas as pd
@@ -7,6 +8,64 @@ from typing import IO, List
 from openpyxl.utils import get_column_letter
 import numpy as np
 from pynanomapper.datamodel.templates.template_config import TemplateDesignerConfig
+
+
+def generate_uuid(prefix: str, s: str) -> str:
+    """"{prefix}-{name-uuid}", matching
+    net.enanomapper.parser.ExcelParserConfigurator.generateUUID(prefix, s) in
+    nmdataparser/enmexcelparser exactly: a name-based UUID from the bare MD5
+    of `s`'s UTF-8 bytes, with the version (3) and variant bits patched in --
+    i.e. Java's `UUID.nameUUIDFromBytes`, NOT Python's `uuid.uuid3` (which
+    additionally prepends a namespace UUID's bytes before hashing, so it is
+    NOT a drop-in equivalent and produces a different UUID for the same
+    input).
+
+    Deterministic: converting the SAME workbook/material/assay identity
+    again produces the SAME uuid, so re-running the pipeline replaces a
+    previous NeXus entry instead of leaving it orphaned under a fresh random
+    id every time. `prefix` is caller-supplied (project-specific, like
+    nmdataparser's own default "XLSX") rather than hardcoded here.
+    """
+    digest = bytearray(hashlib.md5(s.encode("utf-8")).digest())
+    digest[6] = (digest[6] & 0x0F) | 0x30  # version 3
+    digest[8] = (digest[8] & 0x3F) | 0x80  # variant
+    return "{}-{}".format(prefix, str(uuid.UUID(bytes=bytes(digest))))
+
+# Template Designer blueprints declare a fixed, predefined set of
+# METADATA_PARAMETERS/METADATA_SAMPLE_PREP `param_group` values -- not free
+# text, an enumeration -- so each is mapped explicitly onto the real NeXus
+# group it belongs to (pyambit.nexus_writer.to_nexus's parameter loop splits
+# a "<group>/<name>" parameter key on "/" and writes it as a nested NeXus
+# group, using whatever the first segment says verbatim). Without this, a
+# blueprint group like "CULTURE CONDITIONS" or "CELL LINE DETAILS" was
+# written as its own literal top-level NeXus group instead of joining the
+# standard vocabulary (environment/instrument/parameters) other readers
+# expect. Keys are matched case-insensitively -- get_parameters() uses the
+# blueprint's own casing, _get_pchem_parameters() lowercases it first.
+PARAM_GROUP_TO_NEXUS_GROUP = {
+    "CALIBRATION": "calibration",
+    "CELL LINE DETAILS": "environment",
+    "CULTURE CONDITIONS": "environment",
+    "ENVIRONMENT": "environment",
+    "INSTRUMENT": "instrument",
+    "MEASUREMENT CONDITIONS": "instrument",
+    "MEDIUM": "environment",
+    "OTHER_METADATA": "parameters",
+    "RESULT_ANALYSIS": "parameters",
+}
+
+
+def _map_param_group(group) -> str:
+    """The real NeXus group a blueprint `param_group` belongs to, via
+    PARAM_GROUP_TO_NEXUS_GROUP (case-insensitive) -- or the group name
+    unchanged when it is not one of the predefined blueprint groups, so an
+    unrecognized group still writes somewhere sensible instead of being
+    silently dropped.
+    """
+    if group is None:
+        return group
+    mapped = PARAM_GROUP_TO_NEXUS_GROUP.get(str(group).strip().upper())
+    return mapped if mapped is not None else group
 
 
 class TemplateDesignerParser(TemplateDesignerConfig):
@@ -309,13 +368,14 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 if value.empty:
                     continue
                 value = value.iloc[0,0]
+                nx_group = _map_param_group(p_group)
                 if p_unit is None:
                     if isinstance(value, numbers.Number):
-                        params[f"{p_group}/{p_name}"] = mx.Value(loValue=value)
+                        params[f"{nx_group}/{p_name}"] = mx.Value(loValue=value)
                     elif pd.isna(value):
                         pass
                     else:
-                        params[f"{p_group}/{p_name}"] = value  # already string                    
+                        params[f"{nx_group}/{p_name}"] = value  # already string
                 else:
                     _val, _unit = self.parse_value_unit(value, p_unit)
                     # parse_value_unit falls back to returning the original
@@ -326,11 +386,11 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     # parameter instead, the same as the p_unit is None
                     # branch above already does.
                     if isinstance(_val, numbers.Number):
-                        params[f"{p_group}/{p_name}"] = mx.Value(
+                        params[f"{nx_group}/{p_name}"] = mx.Value(
                             loValue=_val, unit=_unit
                         )
                     elif not pd.isna(_val):
-                        params[f"{p_group}/{p_name}"] = _val
+                        params[f"{nx_group}/{p_name}"] = _val
         return params
 
     # --- Detect actual columns in MultiIndex safely ---
@@ -693,6 +753,7 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         convert_to_arrays: bool = True,
         text_conditions: List[str] = None,
         share_conditions: dict = None,
+        uuid_prefix: str = "XLSX",
     ) -> mx.ProtocolApplication:
         """
         Convert parsed Excel template to AMBIT ProtocolApplication.
@@ -705,10 +766,17 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                 it can be dumped for verification or handed to the original
                 AMBIT importers, neither of which an assembled array grid
                 supports.
+            uuid_prefix: passed to generate_uuid() for assay_uuid/
+                investigation_uuid -- project-specific (matches
+                nmdataparser's own ExcelParserConfigurator.generateUUID,
+                whose default is likewise a plain string, not derived from
+                the workbook), so a caller converting several projects'
+                workbooks through the same pipeline can keep their UUID
+                spaces from colliding.
 
         Returns:
             ProtocolApplication object with protocol, parameters, and effects
-            
+
         Example:
             >>> parser = TemplateDesignerParser("template.xlsx")
             >>> pa = parser.to_protocol_application()
@@ -781,14 +849,48 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                         share_conditions=share_conditions,
                     )
                 )
+        # investigation_uuid links related investigations across DIFFERENT
+        # assay types run on the same project/work package -- e.g. a
+        # physchem characterization and its paired bioassay -- so every
+        # workbook that shares project+work_package must resolve to the
+        # SAME uuid; a random uuid4() per file could never do that no
+        # matter how many times the pipeline reruns.
+        project_name = self.get_project_name()
+        work_package = self.get_work_package()
+        investigation_uuid = self.template_json.get("investigation_uuid")
+        if investigation_uuid is None and project_name:
+            investigation_uuid = generate_uuid(
+                uuid_prefix, f"{project_name}/{work_package or ''}"
+            )
+        elif investigation_uuid is None:
+            investigation_uuid = str(uuid.uuid4())
+
+        # assay_uuid identifies "the same assay" across the several files it
+        # is commonly split into -- project-scoped (the same technique name
+        # exists in other projects too) and specific enough to separate real
+        # protocol variants (e.g. ELISA run submerged vs ALI), which
+        # guideline (the EXPERIMENT/SOP text) already distinguishes.
+        assay_uuid = self.template_json.get("assay_uuid")
+        if assay_uuid is None and project_name:
+            assay_uuid = generate_uuid(
+                uuid_prefix,
+                "/".join(
+                    x
+                    for x in (project_name, protocol.endpoint, *(protocol.guideline or []))
+                    if x
+                ),
+            )
+        elif assay_uuid is None:
+            assay_uuid = str(uuid.uuid4())
+
         # Create ProtocolApplication
         pa = mx.ProtocolApplication(
             protocol=protocol,
             effects=effects,
             parameters=parameters,
             uuid=str(uuid.uuid4()),
-            investigation_uuid=self.template_json.get("investigation_uuid", str(uuid.uuid4())),
-            assay_uuid=self.template_json.get("assay_uuid", str(uuid.uuid4())),
+            investigation_uuid=investigation_uuid,
+            assay_uuid=assay_uuid,
             citation=mx.Citation(
                 owner=(
                     self.get_partner()
@@ -837,7 +939,8 @@ class TemplateDesignerParser(TemplateDesignerConfig):
             value = row[col]
             if pd.isna(value):
                 continue
-            params[f"{str(group).lower()}/{str(name).lower()}"] = value
+            nx_group = str(_map_param_group(group)).lower()
+            params[f"{nx_group}/{str(name).lower()}"] = value
         return params
 
     def _parse_effects_from_pchem(
@@ -1087,6 +1190,7 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         pa: mx.ProtocolApplication = None,
         aux_signals: dict = None,
         convert_to_arrays: bool = True,
+        uuid_prefix: str = "XLSX",
     ) -> mx.Substances:
         """
         Convert parsed Excel to Substances with study data.
@@ -1239,7 +1343,11 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     protocol=pa.protocol,
                     effects=own_effects,
                     parameters=pa.parameters,
-                    uuid=str(uuid.uuid4()),
+                    # Deterministic, keyed by this assay + this material --
+                    # re-running the pipeline over the same workbook must
+                    # replace the previous NeXus entry for this substance
+                    # instead of writing a fresh, unrelated one every time.
+                    uuid=generate_uuid(uuid_prefix, f"{pa.assay_uuid}/{material_id}"),
                     investigation_uuid=pa.investigation_uuid,
                     assay_uuid=pa.assay_uuid,
                     citation=pa.citation,
