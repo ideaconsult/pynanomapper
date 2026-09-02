@@ -291,8 +291,8 @@ def test_to_substances_routes_each_record_to_its_own_material():
         effect = substance.study[0].effects[0]
         return set(np.asarray(effect.signal.values, dtype=float).tolist())
 
-    # `name` is the material ID (see to_substances: i5uuid/name/publicname
-    # are all set from the same stripped material_id).
+    # `name` is the material ID (see to_substances: name/publicname are set
+    # from the stripped material_id; i5uuid is a generated uuid instead).
     by_material = {s.name: s for s in substances}
     # No conditions on either endpoint, so each substance's own records
     # assemble into one EffectArray (convert_effectrecords2array) -- the

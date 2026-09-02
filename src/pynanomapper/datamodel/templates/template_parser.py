@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+import warnings
 import pyambit.datamodel as mx
 import pandas as pd
 import numbers
@@ -81,18 +82,47 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         tc.columns = [get_column_letter(i+1) for i in range(tc.shape[1])]
         self.test_conditions = tc
         _data_sheets = self.template_json["data_sheets"]
-        if "data_raw" in _data_sheets:
-            self.raw = pd.read_excel(xlsx_file, sheet_name="Raw_data_TABLE", header=[0,1])
-        else:
-            self.raw = None
-        if "data_processed" in _data_sheets:
-            self.results = pd.read_excel(xlsx_file, sheet_name="Results_TABLE", header=[0,1])
-        else:
-            self.results = None
-        if "data_calibration" in _data_sheets:
-            self.calibration = pd.read_excel(xlsx_file, sheet_name="Calibration_TABLE", header=[0,1])
-        else:
-            self.calibration = None
+        # The blueprint's data_sheets lists which data tables the template
+        # was generated with, but a hand-edited workbook can be missing the
+        # actual sheet (e.g. a run where only processed data was kept and
+        # Raw_data_TABLE was deleted). A missing declared sheet is a
+        # warning, not a hard failure: fall back to None -- every reader of
+        # self.raw / self.results / self.calibration already checks for
+        # None -- so the rest of the workbook still converts.
+        self.raw = self._optional_sheet(
+            xlsx_file, "Raw_data_TABLE", "data_raw" in _data_sheets, header=[0, 1]
+        )
+        self.results = self._optional_sheet(
+            xlsx_file, "Results_TABLE", "data_processed" in _data_sheets, header=[0, 1]
+        )
+        self.calibration = self._optional_sheet(
+            xlsx_file,
+            "Calibration_TABLE",
+            "data_calibration" in _data_sheets,
+            header=[0, 1],
+        )
+
+    @staticmethod
+    def _optional_sheet(xlsx_file, sheet_name, declared, header):
+        """Read `sheet_name` if the blueprint declares it. Return None (with
+        a warning) when it is declared but absent from the workbook, or not
+        declared at all."""
+        if not declared:
+            return None
+        try:
+            return pd.read_excel(xlsx_file, sheet_name=sheet_name, header=header)
+        except ValueError as err:
+            # openpyxl/pandas raise ValueError("Worksheet named '...' not
+            # found") for a missing sheet -- distinguish it from a real
+            # parse error, which should still propagate.
+            if "not found" not in str(err):
+                raise
+            warnings.warn(
+                f"{sheet_name} is declared in the template blueprint but "
+                f"absent from the workbook -- skipping it ({err})",
+                stacklevel=2,
+            )
+            return None
 
     def _init_pchem(self, xlsx_file: IO) -> None:
         """The "pchem" layout (FTIR, SLS, XRF): one Results_TABLE holding
@@ -875,13 +905,27 @@ class TemplateDesignerParser(TemplateDesignerConfig):
         # exists in other projects too) and specific enough to separate real
         # protocol variants (e.g. ELISA run submerged vs ALI), which
         # guideline (the EXPERIMENT/SOP text) already distinguishes.
+        #
+        # The partner that ran the assay is part of assay identity: the same
+        # technique run by two labs is two separate studies, never merged and
+        # never stacked onto one replicate axis (a downstream pipeline that
+        # groups replicate workbooks by assay_uuid relies on this to keep two
+        # labs' runs apart). Without it, e.g. a RIVM and a Maastricht
+        # cytokine-release submission of the same material collapse to one
+        # entry uuid and the second silently overwrites the first in the
+        # index.
         assay_uuid = self.template_json.get("assay_uuid")
         if assay_uuid is None and project_name:
             assay_uuid = generate_uuid(
                 uuid_prefix,
                 "/".join(
                     x
-                    for x in (project_name, protocol.endpoint, *(protocol.guideline or []))
+                    for x in (
+                        project_name,
+                        self.get_partner(),
+                        protocol.endpoint,
+                        *(protocol.guideline or []),
+                    )
                     if x
                 ),
             )
@@ -1359,7 +1403,17 @@ class TemplateDesignerParser(TemplateDesignerConfig):
 
                 # Create SubstanceRecord
                 substance = mx.SubstanceRecord(
-                    i5uuid=material_id,
+                    # Deterministic, keyed by the material alone -- matching
+                    # nmdataparser's GenericExcelParser.getBasicSubstanceRecord
+                    # (ExcelParserConfigurator.generateUUID(prefix, s), s being
+                    # the raw substance-identity cell, nothing else folded
+                    # in). Substance identity must NOT depend on assay_uuid:
+                    # the same material measured under different assays/
+                    # techniques (XRF, SLS, FTIR, ...) has to resolve to the
+                    # SAME i5uuid, or nexus_index.group_files_by_substance
+                    # never merges its files into one substance. The readable
+                    # catalogue id still travels as publicname/name.
+                    i5uuid=generate_uuid(uuid_prefix, material_id),
                     name=material_id,
                     publicname=material_id,
                     substanceType=material_type,  # Default, could be parameterized
@@ -1409,7 +1463,16 @@ class TemplateDesignerParser(TemplateDesignerConfig):
                     # from different substances in the same corpus folder.
                     nx_name=material_id,
                     owner=mx.SampleLink(
-                        substance=mx.Sample(uuid=material_id),
+                        # Same value as substance.i5uuid above -- this is
+                        # what nexus_writer.to_nexus actually writes as the
+                        # sample/substance uuid attribute AND the
+                        # substance/<uuid> group path (papp.owner.substance.uuid,
+                        # not SubstanceRecord.i5uuid directly). They must
+                        # match, or nexus_index.substance_uuids_in_file (which
+                        # reads sample/substance's uuid attribute) recovers a
+                        # different id than the substance this entry actually
+                        # belongs to, and cross-file merging breaks silently.
+                        substance=mx.Sample(uuid=substance.i5uuid),
                         company=mx.Company(name=provider_name)
                     )
                 )
